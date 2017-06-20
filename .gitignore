@@ -1,0 +1,7 @@
+*.pyc
+*.log
+*.json
+*.tex
+.DS_Store
+.project
+.pydevproject
