@@ -43,11 +43,13 @@ def _make_class_weight(md, rec, h5file, name='class_weight'):
         wgt[loc] = md.reweight_info[label]['class_wgt']
     _write_carray(wgt, h5file, name)
 
-def _transform_var(md, rec, h5file, cols, pad_method='min'):
+def _transform_var(md, rec, h5file, cols, no_transform=False, pad_method='min'):
     for var in cols:
         var = str(var)  # get rid of unicode
-        if var in md.var_no_transform_branches:
+        if no_transform:
+            logging.debug('Writing variable orig_%s without transformation' % var)
             _write_carray(rec[var], h5file, name='orig_%s' % var)
+            continue
         logging.debug('Transforming variable %s' % var)
         info = md.branches_info[var]
         median = np.float32(info['median'])
@@ -67,7 +69,7 @@ def _transform_var(md, rec, h5file, cols, pad_method='min'):
             a = pad_sequences(rec[var], maxlen=info['size'], dtype='float32', padding='post', truncating='post', value=pad_value)
             a = np.nan_to_num(a)  # FIXME: protect against NaN
         else:
-            a = rec[var]
+            a = rec[var].copy()  # need to copy, otherwise modifying the original array
         ne.evaluate('(a-median)/scale', out=a)
         _write_carray(a, h5file, name=var)
 
@@ -96,6 +98,7 @@ def writeData(md, outputdir, jobid, batch_mode=False, test_sample=False, events=
             _make_weight(md, rec, h5file)
             _make_class_weight(md, rec, h5file)
             logging.debug(log_prefix + 'Start transforming variables')
+            _transform_var(md, rec, h5file, md.var_no_transform_branches, no_transform=True)
             _transform_var(md, rec, h5file, md.var_branches)
             if md.var_img:
                 logging.debug(log_prefix + 'Start making images')

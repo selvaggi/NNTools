@@ -134,7 +134,7 @@ def load_data(args):
 
     if args.predict:
         test_filelist = glob.glob(args.data_test)
-        test = DataLoader(test_filelist, d, batch_size=args.batch_size, predict_mode=True, shuffle=False)
+        test = DataLoader(test_filelist, d, batch_size=args.batch_size, predict_mode=True, shuffle=False, args=args)
         return test
     else:
         train = DataLoader(train_val_filelist[:n_train], d, batch_size=args.batch_size, args=args)
