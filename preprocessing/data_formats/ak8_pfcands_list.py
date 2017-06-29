@@ -44,7 +44,7 @@ var_blacklist = [
 var_no_transform_branches = [
     'npv',
     'npfcands', 'ntracks', 'nsv',
-    'fj_pt', 'fj_eta', 'fj_tau21', 'fj_tau32',
+    'fj_pt', 'fj_eta', 'fj_phi', 'fj_tau21', 'fj_tau32',
     'fj_sdmass', 'fj_n_sdsubjets', 'fj_doubleb',
     ]
 label_list = ['fj_isLight', 'fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH']

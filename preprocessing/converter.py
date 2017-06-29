@@ -43,7 +43,7 @@ def _make_class_weight(md, rec, h5file, name='class_weight'):
         wgt[loc] = md.reweight_info[label]['class_wgt']
     _write_carray(wgt, h5file, name)
 
-def _transform_var(md, rec, h5file, cols, no_transform=False, pad_method='min'):
+def _transform_var(md, rec, h5file, cols, no_transform=False, pad_method='zero'):
     for var in cols:
         var = str(var)  # get rid of unicode
         if no_transform:
