@@ -53,12 +53,15 @@ def update_metadata(args):
     return md,njobs
 
 def submit(args):
-    from helper import xrd
-
-    md,njobs = update_metadata(args)
+    
+    scriptfile = os.path.join(args.jobdir, 'runjob.sh')
     metadatafile = os.path.join(args.jobdir, args.metadata)
 
-    script = \
+    if not args.resubmit:
+        from helper import xrd
+        md, njobs = update_metadata(args)
+
+        script = \
 '''#!/bin/bash
 jobid=$1
 workdir=`pwd`
@@ -94,36 +97,51 @@ exit $status
            xrdcp='' if not args.outputdir.startswith('/eos') else 'xrdcp -np *.h5 %s ; rm *.h5' % (xrd(args.outputdir) + '/')
            )
 
-    scriptfile = os.path.join(args.jobdir, 'runjob.sh')
-    with open(scriptfile, 'w') as f:
-        f.write(script)
-    os.system('chmod +x %s' % scriptfile)
+        with open(scriptfile, 'w') as f:
+            f.write(script)
+        os.system('chmod +x %s' % scriptfile)
+
+    if args.resubmit:
+        jobids = []
+        jobids_file = os.path.join(args.jobdir, 'resubmit.txt')
+        log_files = [f for f in os.listdir(args.jobdir) if f.endswith('.log')]
+        for fn in log_files:
+            with open(os.path.join(args.jobdir, fn)) as logfile:
+                log = logfile.read()
+                if 'Job terminated' in log and 'return value 0' not in log:
+                    jobids.append(fn.split('.')[0])
+                    assert jobids[-1].isdigit()
+    else:
+        jobids = [str(jobid) for jobid in range(njobs)]
+        jobids_file = os.path.join(args.jobdir, 'submit.txt')
+
+    with open(jobids_file, 'w') as f:
+        f.write('\n'.join(jobids))
 
     condordesc = '''\
 universe              = vanilla
 requirements          = (Arch == "X86_64") && (OpSys == "LINUX")
 request_disk          = 10000000
 executable            = {scriptfile}
-arguments             = $(Process)
+arguments             = $(jobid)
 transfer_input_files  = {metadatafile}
-output                = {jobdir}/$(Process).out
-error                 = {jobdir}/$(Process).err
-log                   = {jobdir}/$(Process).log
+output                = {jobdir}/$(jobid).out
+error                 = {jobdir}/$(jobid).err
+log                   = {jobdir}/$(jobid).log
 use_x509userproxy     = true
 Should_Transfer_Files = YES
-queue {njobs}
+queue jobid from {jobids_file}
 '''.format(scriptfile=os.path.abspath(scriptfile),
            metadatafile=os.path.abspath(metadatafile),
            jobdir=os.path.abspath(args.jobdir),
            outputdir=args.outputdir,
-           njobs=njobs
+           jobids_file=os.path.abspath(jobids_file)
     )
     condorfile = os.path.join(args.jobdir, 'submit.cmd')
     with open(condorfile, 'w') as f:
         f.write(condordesc)
 
     print('Run the following command to submit the jobs:\ncondor_submit {condorfile}'.format(condorfile=condorfile))
-
 
 def run_all(args):
     md, njobs = update_metadata(args)
@@ -157,6 +175,10 @@ def main():
         default='condor', choices=['interactive', 'condor'],
         help='Method of job submission. [Default: %(default)s]'
         )
+    parser.add_argument('--resubmit',
+        action='store_true', default=False,
+        help='Resubmit failed jobs. Default: %(default)s'
+    )
     parser.add_argument('-j', '--jobdir',
         default='jobs',
         help='Directory for job files. [Default: %(default)s]'

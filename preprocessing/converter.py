@@ -115,7 +115,7 @@ def writeData(md, outputdir, jobid, batch_mode=False, test_sample=False, events=
     frac = float(events) / sum(md.num_events)
     use_branches = set(md.var_branches + md.var_no_transform_branches + md.label_branches + [md.reweight_var])
     if md.var_img:
-        use_branches += set([md.var_img] + md.var_pos)
+        use_branches |= set([md.var_img] + md.var_pos)
 #     use_branches = [str(var) for var in use_branches]
     logging.debug(log_prefix + 'Start loading from root files')
 
