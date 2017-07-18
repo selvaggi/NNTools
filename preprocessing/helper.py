@@ -18,7 +18,7 @@ def xrd(filepath):
     else:
         return filepath
 
-def get_num_events(filepath, treename):
+def get_num_events(filepath, treename, selection=None):
     import ROOT as rt
     rt.gROOT.SetBatch(True)
     import traceback
@@ -27,7 +27,10 @@ def get_num_events(filepath, treename):
         tree = f.Get(str(treename))
         if not tree:
             raise RuntimeError('Cannot find tree %s in file %s' % (treename, filepath))
-        return tree.GetEntries()
+        if selection is None:
+            return tree.GetEntries()
+        else:
+            return tree.GetEntries(selection)
     except:
         logging.error('Error reading %s:\n%s' % (filepath, traceback.format_exc()))
         return None

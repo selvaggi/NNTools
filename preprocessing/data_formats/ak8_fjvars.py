@@ -4,11 +4,12 @@ Description on how to produce metadata file.
 
 treename = 'deepntuplizer/tree'
 reweight_events = -1
-reweight_bins = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650,
-               700, 800, 900, 1000, 1100,
-               1200, 1400, 1600, 5000]
+reweight_bins = list(range(200, 2000, 50))
 metadata_events = 1000000
-selection = 'jet_tightId && (fj_isTop && fj_pt>400) || (fj_isH && fj_pt>300) || (!fj_isTop && !fj_isH)'
+selection = '''jet_tightId \
+&& ( (sample_isQCD && fj_isQCD) || (!sample_isQCD && !fj_isQCD)) \
+&& ( !label_H_cc )'''
+# && ( (label_Top_bcq || label_Top_bqq) && fj_pt>400 ) || ( !(label_Top_bcq || label_Top_bqq) ) \
 var_groups = {
     # 'group_name': ( ('regex1', 'regex2', ...), list_length )
     'fjvars': (('fj_',), None),
@@ -24,8 +25,6 @@ var_blacklist = [
 
     'fj_isBB',
     'fj_isNonBB',
-    'fj_label',
-    'fj_labelJMAR',
 
     'n_pfcands',
     'pfcand_VTX_ass',
@@ -45,13 +44,26 @@ var_blacklist = [
     'n_sv',
     ]
 var_no_transform_branches = [
+    'fj_labelLegacy',
+    'fj_labelJMAR',
+    'fj_label',
+    'fj_isQCD', 'fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH',
     'npv',
-    'npfcands', 'ntracks', 'nsv',
-    'fj_pt', 'fj_eta', 'fj_tau21', 'fj_tau32',
-    'fj_sdmass', 'fj_n_sdsubjets', 'fj_doubleb',
+    'n_pfcands', 'n_tracks', 'n_sv',
+    'fj_pt', 'fj_eta', 'fj_phi', 'fj_mass',
+    'fj_tau21', 'fj_tau32',
+    'fj_sdmass', 'fj_n_sdsubjets',
+    'fj_doubleb', 'pfCombinedInclusiveSecondaryVertexV2BJetTags',
     ]
-label_list = ['fj_isLight', 'fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH']
+# label_list = ['fj_isQCD', 'fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH']
+label_list = ['label_Top_bcq', 'label_Top_bqq', 'label_Top_bc', 'label_Top_bq',
+              'label_W_cq', 'label_W_qq',
+              'label_Z_bb', 'label_Z_cc', 'label_Z_qq',
+              'label_H_bb', 'label_H_qqqq',
+              'label_QCD_bb', 'label_QCD_cc', 'label_QCD_b', 'label_QCD_c', 'label_QCD_others',
+              ]
 reweight_var = 'fj_pt'
+reweight_classes = ['fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH', 'fj_isQCD']
 var_img = None
 var_pos = None
 n_pixels = None

@@ -28,7 +28,7 @@ def _make_labels(md, rec, h5file, name='label'):
 
 def _make_weight(md, rec, h5file, name='weight'):
     wgt = np.zeros(rec.shape[0], dtype=np.float32)
-    for label in md.label_branches:
+    for label in md.reweight_classes:
         info = md.reweight_info[label]
         loc = rec[label] == 1
         rwgt_by = rec[md.reweight_var][loc]
@@ -38,7 +38,7 @@ def _make_weight(md, rec, h5file, name='weight'):
 
 def _make_class_weight(md, rec, h5file, name='class_weight'):
     wgt = np.zeros(rec.shape[0], dtype=np.float32)
-    for label in md.label_branches:
+    for label in md.reweight_classes:
         loc = rec[label][:] == 1
         wgt[loc] = md.reweight_info[label]['class_wgt']
     _write_carray(wgt, h5file, name)
@@ -113,7 +113,7 @@ def writeData(md, outputdir, jobid, batch_mode=False, test_sample=False, events=
         return
 
     frac = float(events) / sum(md.num_events)
-    use_branches = set(md.var_branches + md.var_no_transform_branches + md.label_branches + [md.reweight_var])
+    use_branches = set(md.var_branches + md.var_no_transform_branches + md.label_branches + md.reweight_classes + [md.reweight_var])
     if md.var_img:
         use_branches |= set([md.var_img] + md.var_pos)
 #     use_branches = [str(var) for var in use_branches]

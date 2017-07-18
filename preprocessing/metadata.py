@@ -33,6 +33,7 @@ class Metadata(object):
                  var_no_transform_branches=None,
                  label_list=None,
                  reweight_var='fj_pt',
+                 reweight_classes=['fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH', 'fj_isQCD'],
                  var_img='pfcand_ptrel',
                  var_pos=['pfcand_etarel', 'pfcand_phirel'],
                  n_pixels=64,
@@ -42,6 +43,7 @@ class Metadata(object):
 
         self.treename = treename
         self.reweight_var = reweight_var
+        self.reweight_classes = reweight_classes
         self._reweight_events = reweight_events
         self._reweight_bins = reweight_bins
         self._metadata_events = metadata_events
@@ -83,6 +85,7 @@ class Metadata(object):
     def updateFilelist(self, test_sample=False):
         self.inputfiles = []
         self.num_events = []
+        counter = 0
         for dp, dn, filenames in os.walk(self._inputdir):
             if 'failed' in dp or 'ignore' in dp:
                 continue
@@ -96,15 +99,24 @@ class Metadata(object):
                 if not f.endswith('.root'):
                     continue
                 fullpath = os.path.join(dp, f)
-                nevts = get_num_events(fullpath, self.treename)
+                nevts = get_num_events(fullpath, self.treename, self.selection)
                 if nevts:
                     self.inputfiles.append(fullpath)
                     self.num_events.append(nevts)
+                    counter += 1
+                    if counter%10==0:
+                        logging.debug('%d files processed...' % counter)
                 else:
                     logging.warning('Ignore erroneous file %s' % fullpath)
         self._total_events = sum(self.num_events)
         logging.info('Created file list from directory %s\nFiles:%d, Events:%d' % (self._inputdir, len(self.inputfiles), self._total_events))
         return (self.inputfiles, self.num_events)
+
+    def updateWeights(self, test_sample=False):
+        if test_sample:
+            return
+        else:
+            self._make_weights()
 
     def writeMetadata(self, filepath):
         with open(filepath, 'w') as metafile:
@@ -130,7 +142,7 @@ class Metadata(object):
                         matched = True
                         break
                 if matched: break
-        for var in self.var_blacklist + self.label_branches:
+        for var in self.var_blacklist + self.label_branches + self.reweight_classes:
             try:
                 self.var_branches.remove(var)
             except ValueError:
@@ -144,7 +156,7 @@ class Metadata(object):
         '''
         class_events = {}
         result = {}
-        for label in self.label_branches:
+        for label in self.reweight_classes:
             pos = (rec[label] == 1)
             a = rec[self.reweight_var][pos]
 #             class_events[label] = 0
@@ -161,7 +173,7 @@ class Metadata(object):
                 if hist[i] != 0:
                     result[label]['hist'][i] = ref_val / hist[i]
         min_nevt = min(class_events.values())
-        for label in self.label_branches:
+        for label in self.reweight_classes:
             class_wgt = float(min_nevt) / class_events[label]
             result[label]['class_wgt'] = class_wgt
             result[label]['hist'] = result[label]['hist'].tolist()
@@ -177,13 +189,14 @@ class Metadata(object):
             pieces = []
             for fn, n in zip(self.inputfiles, self.num_events):
                 a = root2array(fn, treename=self.treename, selection=self.selection, stop=int(frac * n),
-                               branches=self.label_branches + [self.reweight_var])
+                               branches=self.reweight_classes + [self.reweight_var])
                 pieces.append(a)
             rec = np.concatenate(pieces)
         else:
+
             rec = root2array(self.inputfiles, treename=self.treename, selection=self.selection,
-                               branches=self.label_branches + [self.reweight_var])
-        logging.info('Use %d events to produce reweight info' % rec.shape[0])
+                               branches=self.reweight_classes + [self.reweight_var])
+        logging.info('Use %d events to produce reweight info, selection:\n%s' % (rec.shape[0], self.selection))
         # get distribution for reweighting
         self.reweight_info = self._prepare_reweight_info(rec)
         logging.debug('Reweight info:\n' + str(self.reweight_info))

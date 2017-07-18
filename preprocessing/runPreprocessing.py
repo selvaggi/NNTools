@@ -27,27 +27,49 @@ def create_metadata(args):
     from importlib import import_module
     d = import_module('data_formats.' + args.data_format)
     md = Metadata(args.inputdir,
-                  d.treename,
-                  d.reweight_events,
-                  d.reweight_bins,
-                  d.metadata_events,
-                  d.selection,
-                  d.var_groups,
-                  d.var_blacklist,
-                  d.var_no_transform_branches,
-                  d.label_list,
-                  d.reweight_var,
-                  d.var_img,
-                  d.var_pos,
-                  d.n_pixels,
-                  d.img_ranges)
+                  treename=d.treename,
+                  reweight_events=d.reweight_events,
+                  reweight_bins=d.reweight_bins,
+                  metadata_events=d.metadata_events,
+                  selection=d.selection,
+                  var_groups=d.var_groups,
+                  var_blacklist=d.var_blacklist,
+                  var_no_transform_branches=d.var_no_transform_branches,
+                  label_list=d.label_list,
+                  reweight_var=d.reweight_var,
+                  reweight_classes=d.reweight_classes,
+                  var_img=d.var_img,
+                  var_pos=d.var_pos,
+                  n_pixels=d.n_pixels,
+                  img_ranges=d.img_ranges,
+                  )
     md.produceMetadata(fullpath)
 
 def update_metadata(args):
     create_metadata(args)
-    md = Metadata(args.inputdir)
+    from importlib import import_module
+    d = import_module('data_formats.' + args.data_format)
+    md = Metadata(args.inputdir,
+                  treename=d.treename,
+                  reweight_events=d.reweight_events,
+                  reweight_bins=d.reweight_bins,
+                  metadata_events=d.metadata_events,
+                  selection=d.selection,
+                  var_groups=d.var_groups,
+                  var_blacklist=d.var_blacklist,
+                  var_no_transform_branches=d.var_no_transform_branches,
+                  label_list=d.label_list,
+                  reweight_var=d.reweight_var,
+                  reweight_classes=d.reweight_classes,
+                  var_img=d.var_img,
+                  var_pos=d.var_pos,
+                  n_pixels=d.n_pixels,
+                  img_ranges=d.img_ranges,
+                  )
     md.loadMetadata(os.path.join(args.outputdir, args.metadata))
     md.updateFilelist(args.test_sample)
+    if args.remake_weights:
+        md.updateWeights(args.test_sample)
     md.writeMetadata(os.path.join(args.jobdir, args.metadata))
     njobs = int(math.ceil(float(sum(md.num_events)) / args.events_per_file))
     return md,njobs
@@ -101,19 +123,26 @@ exit $status
             f.write(script)
         os.system('chmod +x %s' % scriptfile)
 
-    if args.resubmit:
+        jobids = [str(jobid) for jobid in range(njobs)]
+        jobids_file = os.path.join(args.jobdir, 'submit.txt')
+
+    else:
+        # resubmit
         jobids = []
         jobids_file = os.path.join(args.jobdir, 'resubmit.txt')
         log_files = [f for f in os.listdir(args.jobdir) if f.endswith('.log')]
         for fn in log_files:
             with open(os.path.join(args.jobdir, fn)) as logfile:
-                log = logfile.read()
-                if 'Job terminated' in log and 'return value 0' not in log:
-                    jobids.append(fn.split('.')[0])
-                    assert jobids[-1].isdigit()
-    else:
-        jobids = [str(jobid) for jobid in range(njobs)]
-        jobids_file = os.path.join(args.jobdir, 'submit.txt')
+                for line in reversed(logfile.readlines()):
+                    if 'Job submitted from host' in line:
+                        # if seeing this first: the job has been resubmited
+                        break
+                    if 'return value' in line:
+                        if 'return value 0' not in line:
+                            logging.debug(fn + '\n   ' + line)
+                            jobids.append(fn.split('.')[0])
+                            assert jobids[-1].isdigit()
+                        break
 
     with open(jobids_file, 'w') as f:
         f.write('\n'.join(jobids))
@@ -194,6 +223,10 @@ def main():
     parser.add_argument('--test-sample',
         action='store_true', default=False,
         help='Convert test data. Default: %(default)s'
+    )
+    parser.add_argument('--remake-weights',
+        action='store_true', default=False,
+        help='Remake reweighting weights. Default: %(default)s'
     )
     parser.add_argument('--conda-path',
         default='~/miniconda2/bin',
