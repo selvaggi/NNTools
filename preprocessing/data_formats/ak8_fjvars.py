@@ -25,6 +25,17 @@ var_blacklist = [
 
     'fj_isBB',
     'fj_isNonBB',
+    'fj_nbHadrons',
+    'fj_ncHadrons',
+    
+    'fj_label',
+    'fj_labelLegacy',
+    'fj_labelJMAR',
+    'fj_isTop',
+    'fj_isW',
+    'fj_isZ',
+    'fj_isH',
+    'fj_isQCD',
 
     'n_pfcands',
     'pfcand_VTX_ass',

@@ -99,7 +99,7 @@ class Metadata(object):
                 if not f.endswith('.root'):
                     continue
                 fullpath = os.path.join(dp, f)
-                nevts = get_num_events(fullpath, self.treename, self.selection)
+                nevts = get_num_events(fullpath, self.treename)
                 if nevts:
                     self.inputfiles.append(fullpath)
                     self.num_events.append(nevts)
@@ -229,7 +229,7 @@ class Metadata(object):
             a = np.concatenate(pieces)
             if first:
                 first = False
-                logging.debug('Use %d events for var transform info' % a.shape[0])
+                logging.debug('Use %d events from %d files for var transform info' % (a.shape[0], len(_inputfiles)))
             size = None
             if a.dtype == np.object:
                 if var_size:

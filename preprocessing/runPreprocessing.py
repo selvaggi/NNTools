@@ -67,7 +67,8 @@ def update_metadata(args):
                   img_ranges=d.img_ranges,
                   )
     md.loadMetadata(os.path.join(args.outputdir, args.metadata))
-    md.updateFilelist(args.test_sample)
+    if args.remake_filelist:
+        md.updateFilelist(args.test_sample)
     if args.remake_weights:
         md.updateWeights(args.test_sample)
     md.writeMetadata(os.path.join(args.jobdir, args.metadata))
@@ -133,16 +134,21 @@ exit $status
         log_files = [f for f in os.listdir(args.jobdir) if f.endswith('.log')]
         for fn in log_files:
             with open(os.path.join(args.jobdir, fn)) as logfile:
+                errormsg = None
                 for line in reversed(logfile.readlines()):
+                    if 'Job removed' in line:
+                        errormsg = line
                     if 'Job submitted from host' in line:
                         # if seeing this first: the job has been resubmited
                         break
                     if 'return value' in line:
                         if 'return value 0' not in line:
-                            logging.debug(fn + '\n   ' + line)
-                            jobids.append(fn.split('.')[0])
-                            assert jobids[-1].isdigit()
+                            errormsg = line
                         break
+                if errormsg:
+                    logging.debug(fn + '\n   ' + errormsg)
+                    jobids.append(fn.split('.')[0])
+                    assert jobids[-1].isdigit()
 
     with open(jobids_file, 'w') as f:
         f.write('\n'.join(jobids))
@@ -158,6 +164,7 @@ output                = {jobdir}/$(jobid).out
 error                 = {jobdir}/$(jobid).err
 log                   = {jobdir}/$(jobid).log
 use_x509userproxy     = true
++MaxRuntime           = 18000
 Should_Transfer_Files = YES
 queue jobid from {jobids_file}
 '''.format(scriptfile=os.path.abspath(scriptfile),
@@ -223,6 +230,10 @@ def main():
     parser.add_argument('--test-sample',
         action='store_true', default=False,
         help='Convert test data. Default: %(default)s'
+    )
+    parser.add_argument('--remake-filelist',
+        action='store_true', default=False,
+        help='Remake filelist. Default: %(default)s'
     )
     parser.add_argument('--remake-weights',
         action='store_true', default=False,
