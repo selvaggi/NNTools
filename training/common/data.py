@@ -10,6 +10,7 @@ tables.set_blosc_max_threads(4)
 
 def add_data_args(parser):
     data = parser.add_argument_group('Data', 'the input data')
+    data.add_argument('--data-config', type=str, help='the python file for data format')
     data.add_argument('--data-train', type=str, help='the training data')
 #     data.add_argument('--data-val', type=str, help='the validation data')
     data.add_argument('--train-val-split', type=float, help='fraction of files used for training')
@@ -19,27 +20,35 @@ def add_data_args(parser):
     data.add_argument('--data-names', type=str, help='the data names')
     data.add_argument('--label-names', type=str, help='the label names')
     data.add_argument('--weight-names', type=str, help='the training data')
-    data.add_argument('--num-classes', type=int, help='the number of classes')
+#     data.add_argument('--num-classes', type=int, help='the number of classes')
     data.add_argument('--num-examples', type=int, help='the number of training examples')
     data.add_argument('--syn-data', action="store_true", default=False, help='Generate dummy data on the fly.')
+    data.add_argument('--dataloader-nworkers', type=int, default=2, help='the number of threads used for data loader.')
+    data.add_argument('--dataloader-qsize', type=int, default=500, help='the queue size for data loader.')
+    data.add_argument('--dataloader-weight-scale', type=float, default=1, help='the weight scale for data loader.')
+    data.add_argument('--dataloader-max-resample', type=int, default=10, help='max times to repeat the sampling.')
     return data
 
 class DataFormat(object):
-    def __init__(self, train_groups, train_vars, label_var, wgtvar, obs_vars=[], filename=None):
+    def __init__(self, train_groups, train_vars, label_var, wgtvar, obs_vars=[], filename=None, plotting_mode=False):
         self.train_groups = train_groups  # list
         self.train_vars = train_vars  # dict
         self.label_var = label_var
         self.wgtvar = wgtvar  # set to None if not using weights
         self.obs_vars = obs_vars  # list
-        self._set_range()
+        self._set_range(plotting_mode)
         self._parse_file(filename)
 
-    def _set_range(self):
+    def _set_range(self, plotting_mode):
         # weight/var range
         self.WEIGHT_MIN = 0.
         self.WEIGHT_MAX = 1.
-        self.VAR_MIN = -5.
-        self.VAR_MAX = 5.
+        if not plotting_mode:
+            self.VAR_MIN = -5.
+            self.VAR_MAX = 5.
+        else:
+            self.VAR_MIN = -1e99
+            self.VAR_MAX = 1e99
 
     @staticmethod
     def nevts(filename, label_var='label'):
@@ -63,6 +72,7 @@ class DataFormat(object):
         self.train_groups_shapes = {}
         with tables.open_file(filename) as f:
             self.num_classes = getattr(f.root, self.label_var).shape[1]
+            self.class_labels = getattr(f.root, self.label_var).title.split(',')
             for v_group in self.train_groups:
                 n_channels = len(self.train_vars[v_group])
                 a = getattr(f.root, self.train_vars[v_group][0])
@@ -88,7 +98,7 @@ class PyTableEnqueuer(object):
         pickle_safe: use multiprocessing if True, otherwise threading
     """
 
-    def __init__(self, filelist, data_format, batch_size, workers=4, q_size=20, shuffle=True, predict_mode=False, fetch_size=100000, up_sample=False):
+    def __init__(self, filelist, data_format, batch_size, workers=4, q_size=20, shuffle=True, predict_mode=False, fetch_size=100000, up_sample=False, weight_scale=1, max_resample=20):
         self._filelist = filelist
         self._data_format = data_format
         self._batch_size = batch_size
@@ -96,6 +106,8 @@ class PyTableEnqueuer(object):
         self._predict_mode = predict_mode
         self._fetch_size = (fetch_size // batch_size + 1) * batch_size
         self._up_sample = up_sample
+        self._weight_scale = weight_scale
+        self._max_resample = max_resample
 
         self._workers = workers
         self._q_size = q_size
@@ -175,13 +187,18 @@ class PyTableEnqueuer(object):
                     all_indices = np.arange(n_fetched)
                     keep_indices = None
                     if W_fetch is not None:
-                        randwgt = np.random.uniform(size=n_fetched)
+                        randwgt = np.random.uniform(low=0, high=self._weight_scale, size=n_fetched)
                         keep_flags = randwgt < W_fetch
                         if not self._up_sample:
                             keep_indices = all_indices[keep_flags]
                         else:
                             keep_indices = [all_indices[keep_flags]]
-                            n_scale = n_fetched // len(keep_indices[0])
+                            n_scale = n_fetched // max(1, len(keep_indices[0]))
+                            if n_scale > self._max_resample:
+                                if ifile == 0 and fbegin == self._fetch_size:
+                                    logging.debug('n_scale=%d is larger than the max value (%d). Setting to %d' % (n_scale, self._max_resample, self._max_resample))
+                                n_scale = self._max_resample
+#                             print(n_scale)
                             for _ in range(n_scale - 1):
                                 randwgt = np.random.uniform(size=n_fetched)
                                 keep_indices.append(all_indices[randwgt < W_fetch])
@@ -202,7 +219,7 @@ class PyTableEnqueuer(object):
                             Z_fetch = Z_fetch[indices]
 
                     # --------- put batches into the queue ----------
-                    for b in range(0, n_fetched, self._batch_size):
+                    for b in range(0, len(y_fetch), self._batch_size):
 #                         delay = np.random.uniform() / 100
 #                         time.sleep(delay)
                         e = b + self._batch_size
@@ -295,11 +312,13 @@ class PyTableEnqueuer(object):
         self._idx = None
 
 class DataLoader(object):
-    def __init__(self, filelist, data_format, batch_size, workers=2, q_size=100, shuffle=True, predict_mode=False, fetch_size=400000, up_sample=True, args=None):
+    def __init__(self, filelist, data_format, batch_size, shuffle=True, predict_mode=False, fetch_size=600000, up_sample=True, args=None):
         self._data_format = data_format
         self._batch_size = batch_size
-        self._workers = workers
-        self._q_size = q_size
+        self._workers = args.dataloader_nworkers
+        self._q_size = args.dataloader_qsize
+        self._weight_scale = args.dataloader_weight_scale
+        self._max_resample = args.dataloader_max_resample
         self._predict_mode = predict_mode
         self.args = args
 
@@ -313,7 +332,7 @@ class DataLoader(object):
         self.steps_per_epoch = h5_samples // batch_size
 
         if not self.args.syn_data:
-            self.enqueuer = PyTableEnqueuer(filelist, data_format, batch_size, workers, q_size, shuffle, predict_mode, fetch_size, up_sample)
+            self.enqueuer = PyTableEnqueuer(filelist, data_format, batch_size, self._workers, self._q_size, shuffle, predict_mode, fetch_size, up_sample, weight_scale=self._weight_scale, max_resample=self._max_resample)
             self._wait_time = 0.01  # in seconds
 
         self.reset()
@@ -384,7 +403,7 @@ class DataLoader(object):
         if Z_batch is not None:
             self._truths.append(y_batch)
             self._observers.append(Z_batch)
-            if self._ibatch % 10 == 0:
+            if self._ibatch % (self.steps_per_epoch // 50) == 0:
                 logging.info('Batch %d/%d' % (self._ibatch, self.steps_per_epoch))
 #         logging.info('Batch %d/%d' % (self._ibatch, self.steps_per_epoch))
 #         if self._ibatch % 100 == 0 or self._ibatch > self.steps_per_epoch - 100:
