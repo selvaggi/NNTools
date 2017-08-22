@@ -53,3 +53,19 @@ def plotROC(preds, truths, sample_weight=None, output=None, **kwargs):
     if output:
         plt.savefig(output)
     return plt
+
+def plotHist(X_arr, y_arr, weights=None, legends=None, output=None, **kwargs):
+    num_classes = y_arr.shape[1]
+    plt.figure()
+    for i in range(num_classes):
+        pos = y_arr[:, i] == 1
+        a = X_arr[pos]
+        w = weights[pos] if weights is not None else None
+        label = legends[i] if legends is not None else 'class_%d' % i
+        if a.shape[1] == 1:
+            plt.hist(a, label=label, weights=w, **kwargs)
+        else:
+            raise NotImplemented("Cannot plot array with shape %s" % str(a.shape))
+    plt.legend(loc='best')
+    if output:
+        plt.savefig(output)

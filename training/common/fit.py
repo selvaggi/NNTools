@@ -55,6 +55,8 @@ def add_fit_args(parser):
                        help='number of layers in the neural network, required by some networks such as resnet')
     train.add_argument('--gpus', type=str, default='0',
                        help='list of gpus to run, e.g. 0 or 0,2,5. empty means using cpu')
+    train.add_argument('--gpus-work-load', type=str, default=None,
+                       help='list of gpus workload')
     train.add_argument('--kv-store', type=str, default='device',
                        help='key-value store type')
     train.add_argument('--num-epochs', type=int, default=500,
@@ -85,6 +87,8 @@ def add_fit_args(parser):
                        help='report the top-k accuracy. 0 means no report.')
     train.add_argument('--test-io', action='store_true', default=False,
                        help='test reading speed without training')
+    train.add_argument('--make-plots', action='store_true', default=False,
+                       help='make control plots wihtout training')
     train.add_argument('--predict', action='store_true', default=False,
                        help='run prediction instead of training')
     train.add_argument('--predict-output', type=str,
@@ -95,7 +99,7 @@ class dummyKV:
     def __init__(self):
         self.rank = 0
 
-def fit(args, network, data_loader, **kwargs):
+def fit(args, symbol, data_loader, **kwargs):
     """
     train a model
     args : argparse returns
@@ -132,10 +136,41 @@ def fit(args, network, data_loader, **kwargs):
 
         return
 
+    if args.make_plots:
+        import numpy as np
+        from common.util import to_categorical, plotHist
+        X_pieces = []
+        y_pieces = []
+        tic = time.time()
+        for i, batch in enumerate(train):
+            for data, label in zip(batch.data, batch.label):
+                X_pieces.append(data[0].asnumpy())
+                y_pieces.append(label[0].asnumpy())
+            if (i + 1) % args.disp_batches == 0:
+                logging.info('Batch [%d]\tSpeed: %.2f samples/sec' % (
+                    i, args.disp_batches * args.batch_size / (time.time() - tic)))
+                tic = time.time()
+        X = np.concatenate(X_pieces).reshape((-1, train.provide_data[0][1][1]))
+        y_tmp = np.concatenate(y_pieces)
+        y = np.zeros(len(y_tmp), dtype=np.int)
+        y[y_tmp <= 3] = 1
+        y[np.logical_and(y_tmp >= 4, y_tmp <= 5)] = 2
+        y[np.logical_and(y_tmp >= 6, y_tmp <= 8)] = 3
+        y[np.logical_and(y_tmp >= 9, y_tmp <= 10)] = 4
+        y[y_tmp >= 11] = 0
+#         np.clip(X, 200, 2000, out=X)
+        plotHist(X, to_categorical(y), legends=['QCD', 'top', 'W', 'Z', 'Higgs'], output='plot_%s.pdf' % train.provide_data[0][0],
+#                 bins=np.linspace(200, 2000, 19), range=(200, 2000),
+                bins=np.linspace(0, 250, 11),
+#                 bins=np.linspace(-2.4, 2.4, 49),
+                histtype='step')
+        return
+
     logging.info('Data shape:\n' + str(train.provide_data))
     logging.info('Label shape:\n' + str(train.provide_label))
 
     # load model
+    network = symbol.get_symbol(train._data_format.num_classes, **vars(args))
     if 'arg_params' in kwargs and 'aux_params' in kwargs:
         arg_params = kwargs['arg_params']
         aux_params = kwargs['aux_params']
@@ -162,6 +197,7 @@ def fit(args, network, data_loader, **kwargs):
         symbol        = network,
         data_names    = args.data_names.split(','),
         label_names   = args.label_names.split(','),
+        work_load_list=[int(i) for i in args.gpus_work_load.split(',')] if args.gpus_work_load is not None else None,
     )
 
     optimizer_params = {
@@ -254,10 +290,10 @@ def predict(args, data_loader, **kwargs):
     print(preds.shape, truths.shape, observers.shape)
 
     pred_output = {}
-    for i in range(args.num_classes):
-        pred_output['class_%d' % i] = truths[:, i]
-        pred_output['score_%d' % i] = preds[:, i]
-    for i, obs in enumerate(data_iter.d.obs_vars):
+    for i, label in enumerate(data_iter._data_format.class_labels):
+        pred_output['class_%s' % label] = truths[:, i]
+        pred_output['score_%s' % label] = preds[:, i]
+    for i, obs in enumerate(data_iter._data_format.obs_vars):
         pred_output[obs] = observers[:, i]
 
     import pandas as pd
