@@ -7,6 +7,8 @@ Convert root files to pyTables.
 from __future__ import print_function
 
 import os
+import traceback
+import time
 import argparse
 import numpy as np
 import numexpr as ne
@@ -31,9 +33,11 @@ def _make_weight(md, rec, h5file, name='weight'):
     for label in md.reweight_classes:
         info = md.reweight_info[label]
         loc = rec[label] == 1
-        rwgt_by = rec[md.reweight_var][loc]
-        indices = np.clip(np.digitize(rwgt_by, info['bin_edges']) - 1, a_min=0, a_max=len(info['bin_edges']) - 2)
-        wgt[loc] = np.asarray(info['hist'])[indices]
+        rwgt_x_vals = rec[md.reweight_var[0]][loc]
+        rwgt_y_vals = rec[md.reweight_var[1]][loc]
+        x_indices = np.clip(np.digitize(rwgt_x_vals, info['x_edges']) - 1, a_min=0, a_max=len(info['x_edges']) - 2)
+        y_indices = np.clip(np.digitize(rwgt_y_vals, info['y_edges']) - 1, a_min=0, a_max=len(info['y_edges']) - 2)
+        wgt[loc] = np.asarray(info['hist'])[x_indices, y_indices]
     _write_carray(wgt, h5file, name)
 
 def _make_class_weight(md, rec, h5file, name='class_weight'):
@@ -113,7 +117,7 @@ def writeData(md, outputdir, jobid, batch_mode=False, test_sample=False, events=
         return
 
     frac = float(events) / sum(md.num_events)
-    use_branches = set(md.var_branches + md.var_no_transform_branches + md.label_branches + md.reweight_classes + [md.reweight_var])
+    use_branches = set(md.var_branches + md.var_no_transform_branches + md.label_branches + md.reweight_classes + md.reweight_var)
     if md.var_img:
         use_branches |= set([md.var_img] + md.var_pos)
 #     use_branches = [str(var) for var in use_branches]
@@ -150,6 +154,99 @@ def writeData(md, outputdir, jobid, batch_mode=False, test_sample=False, events=
 
     logging.info(log_prefix + 'Done!')
 
+def writeData_lowMem(md, outputdir, jobid, batch_mode=False, test_sample=False, events=200000, dryrun=False):
+    ''' Convert input files to a HDF file. '''
+    from root_numpy import root2array
+
+    log_prefix = '[%d] ' % jobid
+    outname = '{type}_file_{jobid}.h5'.format(type='test' if test_sample else 'train', jobid=jobid)
+    output = os.path.join(outputdir, outname)
+    if os.path.exists(output) and os.path.getsize(output) > 100 * 1024 * 1024:
+        # ignore if > 100M
+        logging.info(log_prefix + 'File %s already exist! Skipping.' % output)
+        return
+
+    frac = float(events) / sum(md.num_events)
+#     use_branches = set(md.var_branches + md.var_no_transform_branches + md.label_branches + md.reweight_classes + md.reweight_var)
+#     if md.var_img:
+#         use_branches |= set([md.var_img] + md.var_pos)
+    logging.debug(log_prefix + 'Start loading from root files')
+
+    def _load_raw(branches):
+        pieces = []
+        for fn, n in zip(md.inputfiles, md.num_events):
+            step = int(math.ceil(frac * n))
+            start = step * jobid
+            stop = start + step
+            if start >= n:
+                continue
+            filepath = xrd(fn) if batch_mode else fn
+    #         logging.debug('Load events [%d, %d) from file %s' % (start, stop, filepath))
+            trial = 0
+            while trial < 5:
+                try:
+                    a = root2array(filepath, treename=md.treename, selection=md.selection, branches=branches, start=start, stop=stop)
+                    break
+                except:
+                    logging.error('Error reading %s:\n%s' % (filepath, traceback.format_exc()))
+                    time.sleep(10)
+                    trial += 1
+            if trial >= 5:
+                raise RuntimeError('Cannot read file %s' % filepath)
+            pieces.append(a)
+        rec = np.concatenate(pieces)
+        return rec
+
+    # first make the labels, weights, and no-transform vars
+    use_branches = set(md.var_no_transform_branches + md.label_branches + md.reweight_classes + md.reweight_var)
+    rec = _load_raw(use_branches)
+    if rec.shape[0] == 0:
+        return
+    if not test_sample:
+        # important: shuffle the array if not for testing
+        shuffle_indices = np.arange(rec.shape[0])
+        np.random.shuffle(shuffle_indices)
+        rec = rec[shuffle_indices]
+
+    def _load(branches):
+        a = _load_raw(branches)
+        if test_sample:
+            return a
+        else:
+            return a[shuffle_indices]
+
+    def _write(output):
+        logging.debug(log_prefix + 'Start making output file')
+        with tables.open_file(output, mode='w') as h5file:
+            _make_labels(md, rec, h5file)
+            logging.debug(log_prefix + 'Start producing weights')
+            _make_weight(md, rec, h5file)
+            _make_class_weight(md, rec, h5file)
+            logging.debug(log_prefix + 'Start writing observer variables')
+            _transform_var(md, rec, h5file, md.var_no_transform_branches, no_transform=True)
+            logging.debug(log_prefix + 'Start transforming variables')
+            for var in md.var_branches:
+                logging.debug(log_prefix + 'Transforming var: %s' % var)
+                a = _load([var])
+                _transform_var(md, a, h5file, [var])
+            if md.var_img:
+                logging.debug(log_prefix + 'Start making images')
+                a = _load([md.var_img] + md.var_pos)
+                _make_image(md, a, h5file, output='img')
+
+    if batch_mode:
+        if not dryrun:
+            _write(outname)
+        logging.info(log_prefix + 'Writing output to: \n' + outname)
+    else:
+        output_tmp = output + '.tmp'
+        if not dryrun:
+            _write(output_tmp)
+            os.rename(output_tmp, output)
+        logging.info(log_prefix + 'Writing output to: \n' + output)
+
+    logging.info(log_prefix + 'Done!')
+
 
 def batch_write(args):
     from metadata import Metadata
@@ -160,6 +257,8 @@ def batch_write(args):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(levelname)s: %(message)s')
+
     parser = argparse.ArgumentParser(description='Convert root files to PyTables.')
     parser.add_argument('-m', '--metadata',
         default='metadata.json',

@@ -5,7 +5,6 @@ Description on how to produce metadata file.
 treename = 'deepntuplizer/tree'
 reweight_events = -1
 reweight_bins = [list(range(200, 2051, 50)), [-10000, 10000]]
-# reweight_bins = [list(range(200, 2051, 50)), list(range(0, 251, 10))] # reweight in (pt, mass)
 metadata_events = 1000000
 selection = '''jet_tightId \
 && ( !label_H_cc )'''
@@ -13,8 +12,8 @@ selection = '''jet_tightId \
 var_groups = {
     # 'group_name': ( ('regex1', 'regex2', ...), list_length )
     'pfcand': (('pfcand_',), 100),
-    'track': (('track_', 'trackBTag_',), 60),
-    'sv': (('sv_',), 5),
+#    'track': (('track_', 'trackBTag_',), 60),
+#    'sv': (('sv_',), 5),
     }
 var_blacklist = [
     'fj_gen_pt',
@@ -65,7 +64,7 @@ label_list = ['label_Top_bcq', 'label_Top_bqq', 'label_Top_bc', 'label_Top_bq',
               ]
 reweight_var = ['fj_pt', 'fj_sdmass']
 reweight_classes = ['fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH', 'fj_isQCD']
-var_img = None
-var_pos = None
-n_pixels = None
-img_ranges = None
+var_img = 'pfcand_ptrel'
+var_pos = ['pfcand_etarel', 'pfcand_phirel']
+n_pixels = 64
+img_ranges = [[-0.8, 0.8], [-0.8, 0.8]]

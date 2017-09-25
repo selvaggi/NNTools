@@ -136,7 +136,7 @@ exit $status
             with open(os.path.join(args.jobdir, fn)) as logfile:
                 errormsg = None
                 for line in reversed(logfile.readlines()):
-                    if 'Job removed' in line:
+                    if 'Job removed' in line or 'aborted' in line:
                         errormsg = line
                     if 'Job submitted from host' in line:
                         # if seeing this first: the job has been resubmited
@@ -164,7 +164,7 @@ output                = {jobdir}/$(jobid).out
 error                 = {jobdir}/$(jobid).err
 log                   = {jobdir}/$(jobid).log
 use_x509userproxy     = true
-+MaxRuntime           = 18000
++MaxRuntime           = 172800
 Should_Transfer_Files = YES
 queue jobid from {jobids_file}
 '''.format(scriptfile=os.path.abspath(scriptfile),

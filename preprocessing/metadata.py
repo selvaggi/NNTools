@@ -23,16 +23,14 @@ class Metadata(object):
                  inputdir,
                  treename='deepntuplizer/tree',
                  reweight_events=100000,
-                 reweight_bins=[200, 250, 300, 350, 400, 450, 500, 550, 600, 650,
-                                700, 800, 900, 1000, 1100,
-                                1200, 1400, 1600, 5000],
+                 reweight_bins=[[200, 5000], [-999, 999]],
                  metadata_events=100000,
                  selection=None,
                  var_groups=None,  # {group_name:(regex, num)}
                  var_blacklist=None,
                  var_no_transform_branches=None,
                  label_list=None,
-                 reweight_var='fj_pt',
+                 reweight_var=['fj_pt', 'fj_sdmass'],
                  reweight_classes=['fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH', 'fj_isQCD'],
                  var_img='pfcand_ptrel',
                  var_pos=['pfcand_etarel', 'pfcand_phirel'],
@@ -158,25 +156,28 @@ class Metadata(object):
         result = {}
         for label in self.reweight_classes:
             pos = (rec[label] == 1)
-            a = rec[self.reweight_var][pos]
+            x = np.minimum(rec[self.reweight_var[0]][pos], max(self._reweight_bins[0]))
+            y = np.minimum(rec[self.reweight_var[1]][pos], max(self._reweight_bins[1]))
 #             class_events[label] = 0
-            hist, bin_edges = np.histogram(a, bins=self._reweight_bins, range=(min(self._reweight_bins), max(self._reweight_bins)))
+            hist, x_edges, y_edges = np.histogram2d(x, y, bins=self._reweight_bins)
             hist = np.asfarray(hist, dtype=np.float32)
-            result[label] = {'bin_edges':bin_edges.tolist(), 'hist':hist[:], 'raw_hist':hist[:].tolist()}
+            result[label] = {'x_edges':x_edges.tolist(), 'y_edges':y_edges.tolist(), 'hist':None, 'raw_hist':hist[:].tolist()}
             logging.debug('%s:\n%s' % (label, str(hist)))
-            if min(hist[-2:]) < 10:
+#             if min(hist[-2:]) < 10:
 #                 logging.warning('Not enough events for cateogry %s:\n%s' % (label, str(hist)))
-                raise RuntimeError('Not enough events for cateogry %s:\n%s' % (label, str(hist)))
-            ref_val = np.min([x for x in hist if x > 0])
+#                 raise RuntimeError('Not enough events for cateogry %s:\n%s' % (label, str(hist)))
+            hist_no_zeros = hist[hist > 0]
+            min_val = np.min(hist_no_zeros)
+            ref_val = np.percentile(hist_no_zeros, 10)
+            logging.debug('label:%s, min=%f, ref=%f, ref/min=%f' % (label, min_val, ref_val, ref_val / min_val))
             class_events[label] = ref_val
-            for i in range(len(hist)):
-                if hist[i] != 0:
-                    result[label]['hist'][i] = ref_val / hist[i]
+            wgt = ref_val / hist  # will produce inf if hist[ix,iy]=0
+            wgt[np.isinf(wgt)] = 0  # get rid of inf
+            result[label]['hist'] = wgt.tolist()
         min_nevt = min(class_events.values())
         for label in self.reweight_classes:
             class_wgt = float(min_nevt) / class_events[label]
             result[label]['class_wgt'] = class_wgt
-            result[label]['hist'] = result[label]['hist'].tolist()
         return result
 
     def _make_weights(self):
@@ -189,13 +190,13 @@ class Metadata(object):
             pieces = []
             for fn, n in zip(self.inputfiles, self.num_events):
                 a = root2array(fn, treename=self.treename, selection=self.selection, stop=int(frac * n),
-                               branches=self.reweight_classes + [self.reweight_var])
+                               branches=self.reweight_classes + self.reweight_var)
                 pieces.append(a)
             rec = np.concatenate(pieces)
         else:
 
             rec = root2array(self.inputfiles, treename=self.treename, selection=self.selection,
-                               branches=self.reweight_classes + [self.reweight_var])
+                               branches=self.reweight_classes + self.reweight_var)
         logging.info('Use %d events to produce reweight info, selection:\n%s' % (rec.shape[0], self.selection))
         # get distribution for reweighting
         self.reweight_info = self._prepare_reweight_info(rec)
