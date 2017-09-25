@@ -30,12 +30,13 @@ def add_data_args(parser):
     return data
 
 class DataFormat(object):
-    def __init__(self, train_groups, train_vars, label_var, wgtvar, obs_vars=[], filename=None, plotting_mode=False):
+    def __init__(self, train_groups, train_vars, label_var, wgtvar, obs_vars=[], extra_label_vars=[], filename=None, plotting_mode=False):
         self.train_groups = train_groups  # list
         self.train_vars = train_vars  # dict
         self.label_var = label_var
         self.wgtvar = wgtvar  # set to None if not using weights
         self.obs_vars = obs_vars  # list
+        self.extra_label_vars = extra_label_vars  # list
         self._set_range(plotting_mode)
         self._parse_file(filename)
 
@@ -170,6 +171,11 @@ class PyTableEnqueuer(object):
                     if self._predict_mode:
                         Z_fetch = np.stack([getattr(f.root, v_name)[fbegin:fend] for v_name in self._data_format.obs_vars], axis=1)
 
+                    # extra labels
+                    ext_fetch = None
+                    if self._data_format.extra_label_vars:
+                        ext_fetch = np.stack([getattr(f.root, v_name)[fbegin:fend] for v_name in self._data_format.extra_label_vars], axis=1)
+
                     # weights
                     W_fetch = None
                     if not self._predict_mode and self._data_format.wgtvar:
@@ -217,6 +223,8 @@ class PyTableEnqueuer(object):
                         y_fetch = y_fetch[indices]
                         if Z_fetch is not None:
                             Z_fetch = Z_fetch[indices]
+                        if ext_fetch is not None:
+                            ext_fetch = ext_fetch[indices]
 
                     # --------- put batches into the queue ----------
                     for b in range(0, len(y_fetch), self._batch_size):
@@ -226,8 +234,9 @@ class PyTableEnqueuer(object):
                         X_batch = {v_group:X_fetch[v_group][b:e] for v_group in X_fetch}
                         y_batch = y_fetch[b:e]
                         Z_batch = None if Z_fetch is None else Z_fetch[b:e]
+                        ext_batch = None if ext_fetch is None else ext_fetch[b:e]
                         if len(y_batch) == self._batch_size:
-                            self.queue.put((X_batch, y_batch, Z_batch))
+                            self.queue.put((X_batch, y_batch, ext_batch, Z_batch))
         except Exception:
             # set stop flag if any exception occurs
             self._stop_event.set()
@@ -312,7 +321,7 @@ class PyTableEnqueuer(object):
         self._idx = None
 
 class DataLoader(object):
-    def __init__(self, filelist, data_format, batch_size, shuffle=True, predict_mode=False, fetch_size=600000, up_sample=True, args=None):
+    def __init__(self, filelist, data_format, batch_size, shuffle=True, predict_mode=False, fetch_size=600000, up_sample=True, one_hot_label=False, args=None):
         self._data_format = data_format
         self._batch_size = batch_size
         self._workers = args.dataloader_nworkers
@@ -320,13 +329,17 @@ class DataLoader(object):
         self._weight_scale = args.dataloader_weight_scale
         self._max_resample = args.dataloader_max_resample
         self._predict_mode = predict_mode
+        self._one_hot_label = one_hot_label
         self.args = args
 
         self._provide_data = []
         for v_group in self._data_format.train_groups:
             shape = (batch_size,) + self._data_format.train_groups_shapes[v_group]
             self._provide_data.append((v_group, shape))
+
         self._provide_label = [('softmax_label', (batch_size,))]
+        for v in self._data_format.extra_label_vars:
+            self._provide_label.append(('label_' + v, (batch_size,)))
 
         h5_samples = sum([DataFormat.nevts(filename) for filename in filelist])
         self.steps_per_epoch = h5_samples // batch_size
@@ -380,6 +393,8 @@ class DataLoader(object):
                 raise StopIteration
             self._data = [mx.nd.array(np.random.uniform(size=shape)) for v_group, shape in self._provide_data]
             self._label = [mx.nd.array(np.random.randint(self._data_format.num_classes, size=self.batch_size))]
+            for v in self._data_format.extra_label_vars:
+                self._label.append(mx.nd.random_uniform(shape=self._batch_size))
             return mx.io.DataBatch(self._data, self._label, provide_data=self.provide_data, provide_label=self.provide_label, pad=0)
 
         generator_output = None
@@ -396,10 +411,15 @@ class DataLoader(object):
         if generator_output is None:
             raise StopIteration
 
-        X_batch, y_batch, Z_batch = generator_output
+        X_batch, y_batch, ext_batch, Z_batch = generator_output
 
         self._data = [mx.nd.array(X_batch[v_group]) for v_group in self._data_format.train_groups]
-        self._label = [mx.nd.array(np.argmax(y_batch, axis=1))]  # cannot use one-hot labelling?
+        if self._one_hot_label:
+            self._label = [mx.nd.array(y_batch)]
+        else:
+            self._label = [mx.nd.array(np.argmax(y_batch, axis=1))]  # cannot use one-hot labelling?
+        for i, v in enumerate(self._data_format.extra_label_vars):
+            self._label.append(mx.nd.array(ext_batch[:, i]))
         if Z_batch is not None:
             self._truths.append(y_batch)
             self._observers.append(Z_batch)
