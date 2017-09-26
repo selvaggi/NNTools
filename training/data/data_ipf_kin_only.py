@@ -6,17 +6,17 @@ import os
 import logging
 
 label_var = 'label'
-train_groups = ['pfcand', 'track', 'sv']
+train_groups = ['pfcand']
 train_vars = {}
 train_vars['pfcand'] = (
     'pfcand_ptrel',
-    'pfcand_erel',
+#     'pfcand_erel',
     'pfcand_phirel',
     'pfcand_etarel',
     'pfcand_deltaR',
-    'pfcand_puppiw',
+#     'pfcand_puppiw',
 
-    'pfcand_drminsv',
+#     'pfcand_drminsv',
     'pfcand_drsubjet1',
     'pfcand_drsubjet2',
 
@@ -27,7 +27,7 @@ train_vars['pfcand'] = (
 #     'pfcand_isChargedHad',
 #     'pfcand_isNeutralHad',
 
-    'pfcand_hcalFrac',
+#     'pfcand_hcalFrac',
 
 #     'pfcand_VTX_ass',
 #     'pfcand_fromPV',
@@ -39,72 +39,6 @@ train_vars['pfcand'] = (
 #     'pfcand_dxysig',
     )
 
-train_vars['track'] = (
-    'track_ptrel',
-    'track_erel',
-    'track_phirel',
-    'track_etarel',
-    'track_deltaR',
-#     'track_puppiw',
-#     'track_pt',
-
-    'track_drminsv',
-    'track_drsubjet1',
-    'track_drsubjet2',
-
-#     'track_charge',
-#     'track_isMu',
-#     'track_isEl',
-#     'track_isChargedHad',
-
-#     'track_VTX_ass',
-#     'track_fromPV',
-#     'track_lostInnerHits',
-
-    'track_dz',
-    'track_dzsig',
-    'track_dxy',
-    'track_dxysig',
-
-    'track_normchi2',
-    'track_quality',
-
-    'track_dptdpt',
-    'track_detadeta',
-    'track_dphidphi',
-    'track_dxydxy',
-    'track_dzdz',
-    'track_dxydz',
-    'track_dphidxy',
-    'track_dlambdadz',
-
-    'trackBTag_EtaRel',
-    'trackBTag_PtRatio',
-    'trackBTag_PParRatio',
-    'trackBTag_Sip2dVal',
-    'trackBTag_Sip2dSig',
-    'trackBTag_Sip3dVal',
-    'trackBTag_Sip3dSig',
-    'trackBTag_JetDistVal',
-    )
-
-train_vars['sv'] = (
-    'sv_ptrel',
-    'sv_erel',
-    'sv_phirel',
-    'sv_etarel',
-    'sv_deltaR',
-    'sv_pt',
-    'sv_mass',
-
-    'sv_ntracks',
-    'sv_normchi2',
-    'sv_dxy',
-    'sv_dxysig',
-    'sv_d3d',
-    'sv_d3dsig',
-    'sv_costhetasvpv',
-    )
 obs_vars = [
     'orig_fj_labelJMAR', 'orig_fjJMAR_gen_pt', 'orig_fjJMAR_gen_eta', 'orig_fjJMAR_gen_pdgid',
     'orig_fj_labelLegacy',

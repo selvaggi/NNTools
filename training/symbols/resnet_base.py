@@ -88,17 +88,21 @@ def resnet(input_name, units, filter_list, num_classes, height=1, bottle_neck=Tr
         Workspace used in convolution operator
     """
     k_h = min(height, 3)
+    pad_h = 0 if height == 1 else 1
 
     num_stages = len(units)
     data = mx.sym.Variable(name=input_name)
     data = mx.sym.BatchNorm(data=data, fix_gamma=True, eps=2e-5, momentum=bn_mom, name='%s_bn_data' % input_name)
 
-    if height == 1:
-        body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(3, k_h), stride=(1, 1), pad=(1, 0),
-                              no_bias=True, name="%s_conv0" % input_name, workspace=workspace)
-    else:
-        body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(7, 7), stride=(2, 2), pad=(3, 3),
-                              no_bias=True, name="%s_conv0" % input_name, workspace=workspace)
+    body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(3, k_h), stride=(1, 1), pad=(1, pad_h),
+                          no_bias=True, name="%s_conv0" % input_name, workspace=workspace)
+
+#     if height == 1:
+#         body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(3, k_h), stride=(1, 1), pad=(1, 0),
+#                               no_bias=True, name="%s_conv0" % input_name, workspace=workspace)
+#     else:
+#         body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(7, 7), stride=(2, 2), pad=(3, 3),
+#                               no_bias=True, name="%s_conv0" % input_name, workspace=workspace)
 
 
     for i in range(num_stages):

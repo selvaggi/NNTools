@@ -24,7 +24,7 @@ def add_data_args(parser):
     data.add_argument('--num-examples', type=int, help='the number of training examples')
     data.add_argument('--syn-data', action="store_true", default=False, help='Generate dummy data on the fly.')
     data.add_argument('--dataloader-nworkers', type=int, default=2, help='the number of threads used for data loader.')
-    data.add_argument('--dataloader-qsize', type=int, default=500, help='the queue size for data loader.')
+    data.add_argument('--dataloader-qsize', type=int, default=256, help='the queue size for data loader.')
     data.add_argument('--dataloader-weight-scale', type=float, default=1, help='the weight scale for data loader.')
     data.add_argument('--dataloader-max-resample', type=int, default=10, help='max times to repeat the sampling.')
     return data

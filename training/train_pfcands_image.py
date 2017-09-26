@@ -8,9 +8,9 @@ from importlib import import_module
 
 if __name__ == '__main__':
     # location of data
-    train_val_fname = '/data/hqu/ntuples/20170717/pfcands_minor_labels/train_file_*.h5'
-    test_fname = '/data/hqu/ntuples/20170717/pfcands_minor_labels/testing/train_file_*.h5'
-    example_fname = '/data/hqu/ntuples/20170717/pfcands_minor_labels/train_file_0.h5'
+    train_val_fname = '/data/hqu/ntuples/20170717/pfcands_image_fullmix/train_file_*.h5'
+    test_fname = '/data/hqu/ntuples/20170717/pfcands_image_fullmix/test_file_*.h5'
+    example_fname = '/data/hqu/ntuples/20170717/pfcands_image_fullmix/train_file_?.h5'
 
     # parse args
     parser = argparse.ArgumentParser(description="train pfcands",
@@ -19,12 +19,12 @@ if __name__ == '__main__':
     data.add_data_args(parser)
     parser.set_defaults(
         # network
-        network='resnet_simple',
+        network='resnext_img',
         # config
-        model_prefix='/data/hqu/training/mxnet/models/pfcands_minor_labels-20170717/resnet-simple/resnet',
-        disp_batches=500,
+        model_prefix='/data/hqu/training/mxnet/models/pfcands_img-20170717/resnext-image/resnet',
+        disp_batches=1000,
         # data
-        data_config='data_pfcands',
+        data_config='data_pfcands_image_only',
         data_train=train_val_fname,
         train_val_split=0.8,
         data_test=test_fname,
@@ -34,12 +34,12 @@ if __name__ == '__main__':
         weight_names='weight,class_weight',
         num_examples=-1,
         # train
-        batch_size=1024,
-        num_epochs=200,
-        optimizer='adam',
-        lr=1e-3,
+        batch_size=128,
+        num_epochs=50,
+        optimizer='sgd',
+        lr=0.1,
         top_k=2,
-        lr_step_epochs='10,20,30,50',
+        lr_step_epochs='5,10,15,20,30',
     )
     args = parser.parse_args()
     # load data config
