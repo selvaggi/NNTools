@@ -87,12 +87,12 @@ class Metadata(object):
         for dp, dn, filenames in os.walk(self._inputdir):
             if 'failed' in dp or 'ignore' in dp:
                 continue
-            if not test_sample and 'test_sample' in dp:
-                # train/val samples
-                continue
-            if test_sample and 'test_sample' not in dp:
-                # test samples
-                continue
+#             if not test_sample and 'test_sample' in dp:
+#                 # train/val samples
+#                 continue
+#             if test_sample and 'test_sample' not in dp:
+#                 # test samples
+#                 continue
             for f in filenames:
                 if not f.endswith('.root'):
                     continue
