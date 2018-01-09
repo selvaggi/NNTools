@@ -26,7 +26,8 @@ def create_metadata(args):
 
     from importlib import import_module
     d = import_module('data_formats.' + args.data_format)
-    md = Metadata(args.inputdir,
+    md = Metadata(inputdir=args.inputdir,
+                  input_filter=d.input_filter,
                   treename=d.treename,
                   reweight_events=d.reweight_events,
                   reweight_bins=d.reweight_bins,
@@ -38,6 +39,7 @@ def create_metadata(args):
                   label_list=d.label_list,
                   reweight_var=d.reweight_var,
                   reweight_classes=d.reweight_classes,
+                  reweight_method=d.reweight_method,
                   var_img=d.var_img,
                   var_pos=d.var_pos,
                   n_pixels=d.n_pixels,

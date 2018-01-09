@@ -12,20 +12,29 @@ selection = '''jet_tightId \
 # && ( (sample_isQCD && fj_isQCD) || (!sample_isQCD && !fj_isQCD)) \
 var_groups = {
     # 'group_name': ( ('regex1', 'regex2', ...), list_length )
-    'fjvars': (('fj_sdmass',), None),
+    'part': (('part_',), 150),
+    'sv': (('sv_',), 7),
     }
 var_blacklist = [
     'fj_gen_pt',
     'fj_gen_eta',
+
+    'fj_isBB',
+    'fj_isNonBB',
+
+    'n_parts',
+    'n_pfcands',
+    'n_tracks',
+    'n_sv',
     ]
 var_no_transform_branches = [
     'fj_labelJMAR', 'fjJMAR_gen_pt', 'fjJMAR_gen_eta', 'fjJMAR_gen_pdgid',
     'fj_label',
     'fj_isQCD', 'fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH',
     'npv',
-    'n_pfcands', 'n_tracks', 'n_sv',
+    'n_parts', 'n_pfcands', 'n_tracks', 'n_sv',
     'fj_pt', 'fj_eta', 'fj_phi', 'fj_mass',
-    'fj_n_sdsubjets',
+    'fj_n_sdsubjets', 'fj_nbHadrons', 'fj_ncHadrons',
     'fjPuppi_tau21', 'fjPuppi_tau32', 'fjPuppi_corrsdmass',
     'fj_doubleb', 'pfCombinedInclusiveSecondaryVertexV2BJetTags',
 
@@ -81,7 +90,6 @@ var_no_transform_branches = [
     'fj_tau_flightDistance2dSig_1',
     'fj_jetNTracks',
     'fj_nSV',
-
     ]
 # label_list = ['fj_isQCD', 'fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH']
 label_list = ['label_Top_bcq', 'label_Top_bqq', 'label_Top_bc', 'label_Top_bq',
@@ -90,7 +98,7 @@ label_list = ['label_Top_bcq', 'label_Top_bqq', 'label_Top_bc', 'label_Top_bq',
               'label_H_bb', 'label_H_qqqq',
               'label_QCD_bb', 'label_QCD_cc', 'label_QCD_b', 'label_QCD_c', 'label_QCD_others',
               ]
-reweight_var = ['fj_pt', 'fj_sdmass']
+reweight_var = ['fj_pt', 'fjPuppi_corrsdmass']
 reweight_classes = ['fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH', 'fj_isQCD']
 reweight_method = 'flat'
 var_img = None

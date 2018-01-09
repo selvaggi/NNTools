@@ -29,22 +29,28 @@ def _make_labels(md, rec, h5file, name='label'):
     _write_carray(label, h5file, name=name, title=','.join(md.label_branches))
 
 def _make_weight(md, rec, h5file, name='weight'):
-    wgt = np.zeros(rec.shape[0], dtype=np.float32)
-    for label in md.reweight_classes:
-        info = md.reweight_info[label]
-        loc = rec[label] == 1
-        rwgt_x_vals = rec[md.reweight_var[0]][loc]
-        rwgt_y_vals = rec[md.reweight_var[1]][loc]
-        x_indices = np.clip(np.digitize(rwgt_x_vals, info['x_edges']) - 1, a_min=0, a_max=len(info['x_edges']) - 2)
-        y_indices = np.clip(np.digitize(rwgt_y_vals, info['y_edges']) - 1, a_min=0, a_max=len(info['y_edges']) - 2)
-        wgt[loc] = np.asarray(info['hist'])[x_indices, y_indices]
+    wgt = np.ones(rec.shape[0], dtype=np.float32)
+    if md.reweight_method == 'none':
+        pass
+    else:
+        for label in md.reweight_classes:
+            info = md.reweight_info[label]
+            loc = rec[label] == 1
+            rwgt_x_vals = rec[md.reweight_var[0]][loc]
+            rwgt_y_vals = rec[md.reweight_var[1]][loc]
+            x_indices = np.clip(np.digitize(rwgt_x_vals, info['x_edges']) - 1, a_min=0, a_max=len(info['x_edges']) - 2)
+            y_indices = np.clip(np.digitize(rwgt_y_vals, info['y_edges']) - 1, a_min=0, a_max=len(info['y_edges']) - 2)
+            wgt[loc] = np.asarray(info['hist'])[x_indices, y_indices]
     _write_carray(wgt, h5file, name)
 
 def _make_class_weight(md, rec, h5file, name='class_weight'):
-    wgt = np.zeros(rec.shape[0], dtype=np.float32)
-    for label in md.reweight_classes:
-        loc = rec[label][:] == 1
-        wgt[loc] = md.reweight_info[label]['class_wgt']
+    wgt = np.ones(rec.shape[0], dtype=np.float32)
+    if md.reweight_method == 'none':
+        pass
+    else:
+        for label in md.reweight_classes:
+            loc = rec[label][:] == 1
+            wgt[loc] = md.reweight_info[label]['class_wgt']
     _write_carray(wgt, h5file, name)
 
 def _transform_var(md, rec, h5file, cols, no_transform=False, pad_method='zero'):
@@ -74,6 +80,7 @@ def _transform_var(md, rec, h5file, cols, no_transform=False, pad_method='zero')
             a = np.nan_to_num(a)  # FIXME: protect against NaN
         else:
             a = rec[var].copy()  # need to copy, otherwise modifying the original array
+            a = np.nan_to_num(a)  # FIXME: protect against NaN
         ne.evaluate('(a-median)/scale', out=a)
         _write_carray(a, h5file, name=var)
 

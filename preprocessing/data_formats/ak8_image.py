@@ -2,6 +2,7 @@
 Description on how to produce metadata file.
 '''
 
+input_filter = None
 treename = 'deepntuplizer/tree'
 reweight_events = -1
 reweight_bins = [list(range(200, 2051, 50)), [-10000, 10000]]
@@ -43,7 +44,6 @@ var_blacklist = [
     'n_sv',
     ]
 var_no_transform_branches = [
-    'fj_labelLegacy',
     'fj_labelJMAR', 'fjJMAR_gen_pt', 'fjJMAR_gen_eta', 'fjJMAR_gen_pdgid',
     'fj_label',
     'fj_isQCD', 'fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH',
@@ -64,6 +64,7 @@ label_list = ['label_Top_bcq', 'label_Top_bqq', 'label_Top_bc', 'label_Top_bq',
               ]
 reweight_var = ['fj_pt', 'fj_sdmass']
 reweight_classes = ['fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH', 'fj_isQCD']
+reweight_method = 'flat'
 var_img = 'pfcand_ptrel'
 var_pos = ['pfcand_etarel', 'pfcand_phirel']
 n_pixels = 64
