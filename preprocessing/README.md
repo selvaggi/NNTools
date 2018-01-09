@@ -35,8 +35,8 @@ mkdir -p $HOME/miniconda2/envs/prep/etc/conda/
 cd $HOME/miniconda2/envs/prep/etc/conda/
 mkdir activate.d  deactivate.d
 cd activate.d
-# create the env_vars.sh file with the following content:
-# ------
+# create the env_vars.sh file to get ROOT environment
+cat << EOF > env_vars.sh
 #!/bin/sh
 # $HOME/miniconda2/envs/prep/etc/conda/activate.d/env_vars.sh
 echo "Source root environment..."
@@ -45,7 +45,7 @@ source /cvmfs/sft.cern.ch/lcg/external/gcc/4.9.1/x86_64-slc6/setup.sh
 cd /cvmfs/sft.cern.ch/lcg/releases/ROOT/6.07.06-7096a/x86_64-slc6-gcc49-opt/
 source bin/thisroot.sh
 cd -
-# ------
+EOF
 
 # activate the environment
 # NOTE: should not run any cmsenv beforehand
@@ -71,7 +71,7 @@ source activate prep
 First activate the `prep` conda environment (if not yet done):
 
 ```bash
-python runPreprocessing.py -n 50000 /eos/cms/store/path/to/input /eos/cms/store/path/to/output --data-format ak8_pfcands_list --jobdir jobs -t condor
+python runPreprocessing.py -n 50000 /eos/cms/store/path/to/input /eos/cms/store/path/to/output --data-format ak8_list --jobdir jobs -t condor
 ```
 This will generate the condor submission script to convert the ntuples located at `/eos/cms/store/path/to/input` and output them to `/eos/cms/store/path/to/output`. Note that the input dir `/eos/cms/store/path/to/input` will be recursively searched and all files will be included, so **make sure you put testing samples outside this directory!**
 
@@ -83,7 +83,7 @@ This will generate the condor submission script to convert the ntuples located a
  - If some of the jobs failed in condor, you can generate a resubmission script with only the failed jobs by invoking the `--resubmit` option:
 
 ```bash
-python runPreprocessing.py -n 50000 /eos/cms/store/path/to/input /eos/cms/store/path/to/output --data-format ak8_pfcands_list --jobdir jobs -t condor --resubmit
+python runPreprocessing.py -n 50000 /eos/cms/store/path/to/input /eos/cms/store/path/to/output --data-format ak8_list --jobdir jobs -t condor --resubmit
 ```
 
 ### Convert testing files (JMAR samples)
@@ -100,7 +100,7 @@ mkdir -p /eos/cms/store/path/to/output/JMAR/Top
 # copy the metadata file used for converting the training dataset
 cp /eos/cms/store/path/to/output/metadata.json /eos/cms/store/path/to/output/JMAR/Top
 # create the jobs
-python runPreprocessing.py -n 50000 /eos/cms/store/path/to/JMAR_sample/JMAR/ZprimeToTT_M-3000_W-30_TuneCUETP8M1_13TeV-madgraphMLM-pythia8 /eos/cms/store/path/to/output/JMAR/Top --data-format ak8_pfcands_list --jobdir jobs_Top --remake-filelist
+python runPreprocessing.py -n 50000 /eos/cms/store/path/to/JMAR_sample/JMAR/ZprimeToTT_M-3000_W-30_TuneCUETP8M1_13TeV-madgraphMLM-pythia8 /eos/cms/store/path/to/output/JMAR/Top --data-format ak8_list --jobdir jobs_Top --remake-filelist
 ```
 
  - Specify the path for the Top sample as the input path, and output the files to the `Top` directory.
