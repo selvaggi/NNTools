@@ -30,9 +30,10 @@ def add_data_args(parser):
     return data
 
 class DataFormat(object):
-    def __init__(self, train_groups, train_vars, label_var, wgtvar, obs_vars=[], extra_label_vars=[], filename=None, plotting_mode=False):
+    def __init__(self, train_groups, train_vars, label_var, wgtvar, obs_vars=[], extra_label_vars=[], sort_by=None, filename=None, plotting_mode=False):
         self.train_groups = train_groups  # list
         self.train_vars = train_vars  # dict
+        self.sort_by = sort_by  # dict {v_group:{'var':x, 'descend':False}}
         self.label_var = label_var
         self.wgtvar = wgtvar  # set to None if not using weights
         self.obs_vars = obs_vars  # list
@@ -146,7 +147,25 @@ class PyTableEnqueuer(object):
                     # features
                     X_fetch = {}
                     for v_group in self._data_format.train_groups:
-                        X_group = [getattr(f.root, v_name)[fbegin:fend] for v_name in self._data_format.train_vars[v_group]]
+                        # update variable ordering if needed
+                        if self._data_format.sort_by and self._data_format.sort_by[v_group]:
+                            ref_a = getattr(f.root, self._data_format.sort_by[v_group]['var'])[fbegin:fend]
+                            len_a = getattr(f.root, self._data_format.sort_by[v_group]['length_var'])[fbegin:fend]
+                            for i in range(len_a.shape[0]):
+                                ref_a[i, int(len_a[i]):] = -np.inf if self._data_format.sort_by[v_group]['descend'] else np.inf
+                            if ref_a.ndim != 2:
+                                # shape should be (num_samples, num_particles)
+                                raise NotImplemented('Cannot sort variable group %s'%v_group)
+                            # https://stackoverflow.com/questions/10921893/numpy-sorting-a-multidimensional-array-by-a-multidimensional-array
+                            if self._data_format.sort_by[v_group]['descend']:
+                                sorting_indices = np.argsort(-ref_a, axis=1)
+                            else:
+                                sorting_indices = np.argsort(ref_a, axis=1)
+                            X_group = [getattr(f.root, v_name)[fbegin:fend][np.arange(ref_a.shape[0])[:, np.newaxis], sorting_indices]
+                                       for v_name in self._data_format.train_vars[v_group]]
+                        else:
+                            X_group = [getattr(f.root, v_name)[fbegin:fend] for v_name in self._data_format.train_vars[v_group]]
+                        
                         shape = (-1,) + self._data_format.train_groups_shapes[v_group]  # (n, C, W, H), use -1 because end can go out of range
                         if X_group[0].ndim == 3:
                             # shape=(n, W, H): e.g., 2D image

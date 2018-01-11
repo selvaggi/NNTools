@@ -91,6 +91,8 @@ def add_fit_args(parser):
                        help='make control plots wihtout training')
     train.add_argument('--predict', action='store_true', default=False,
                        help='run prediction instead of training')
+    train.add_argument('--predict-all', action='store_true', default=False,
+                       help='run all predictions')
     train.add_argument('--predict-output', type=str,
                        help='predict output')
     return train
@@ -283,30 +285,47 @@ def predict(args, data_loader, **kwargs):
     )
     model.bind(for_training=False, data_shapes=data_iter.provide_data, label_shapes=data_iter.provide_label)
     model.set_params(arg_params, aux_params)
-    preds = model.predict(data_iter).asnumpy()
-    truths = data_iter.get_truths()
-    observers = data_iter.get_observers()
 
-    print(preds.shape, truths.shape, observers.shape)
+    def _predict(args):
+        data_iter = data_loader(args)
 
-    pred_output = {}
-    for i, label in enumerate(data_iter._data_format.class_labels):
-        pred_output['class_%s' % label] = truths[:, i]
-        pred_output['score_%s' % label] = preds[:, i]
-    for i, obs in enumerate(data_iter._data_format.obs_vars):
-        pred_output[obs] = observers[:, i]
+        preds = model.predict(data_iter).asnumpy()
+        truths = data_iter.get_truths()
+        observers = data_iter.get_observers()
 
-    import pandas as pd
-    df = pd.DataFrame(pred_output)
-    if args.predict_output:
-        logging.info('Write prediction file to %s' % args.predict_output)
-        outdir = os.path.dirname(args.predict_output)
-        if not os.path.exists(outdir):
-            os.makedirs(outdir)
-        df.to_hdf(args.predict_output, 'Events', format='table')
+        print(preds.shape, truths.shape, observers.shape)
 
-        from common.util import plotROC
-        plotROC(preds, truths, output=os.path.join(outdir, 'roc.pdf'))
+        pred_output = {}
+        for i, label in enumerate(data_iter._data_format.class_labels):
+            pred_output['class_%s' % label] = truths[:, i]
+            pred_output['score_%s' % label] = preds[:, i]
+        for i, obs in enumerate(data_iter._data_format.obs_vars):
+            pred_output[obs] = observers[:, i]
 
-        from root_numpy import array2root
-        array2root(df.to_records(index=False), filename=args.predict_output.rsplit('.', 1)[0] + '.root', treename='Events', mode='RECREATE')
+        import pandas as pd
+        df = pd.DataFrame(pred_output)
+        if args.predict_output:
+            logging.info('Write prediction file to %s' % args.predict_output)
+            outdir = os.path.dirname(args.predict_output)
+            if not os.path.exists(outdir):
+                os.makedirs(outdir)
+            df.to_hdf(args.predict_output, 'Events', format='table')
+
+            from common.util import plotROC
+            plotROC(preds, truths, output=os.path.join(outdir, 'roc.pdf'))
+
+            from root_numpy import array2root
+            array2root(df.to_records(index=False), filename=args.predict_output.rsplit('.', 1)[0] + '.root', treename='Events', mode='RECREATE')
+
+    if args.predict_all:
+        import re
+        test_input = re.sub(r'\/JMAR.*\/.*\/', '/_INPUT_/', args.data_test)
+        pred_output = re.sub(r'\/JMAR.*\/.+h5', '/_OUTPUT_', args.predict_output)
+        for a in ['JMAR', 'JMAR_lowM']:
+            for b in ['Top', 'W', 'Z', 'Higgs', 'QCD']:
+                if a == 'JMAR_lowM' and b == 'QCD': b = 'QCD_Flat'
+                args.data_test = test_input.replace('_INPUT_', '%s/%s' % (a, b))
+                args.predict_output = pred_output.replace('_OUTPUT_', '%s/mx-pred_%s.h5' % (a, b))
+                _predict(args)
+    else:
+        _predict(args)
