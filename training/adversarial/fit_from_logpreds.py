@@ -233,7 +233,10 @@ def fit(args, symbol, data_loader, **kwargs):
     if _softmaxD is not None:
         assert symSoftmax.tojson() == _softmaxD.tojson()
 #         assert symAdv.tojson() == _symAdv.tojson()
-        netD.load_params(_param_file, ctx=devs)
+        try:
+            netD.load_params(_param_file, ctx=devs)  # works with block.save_params()
+        except AssertionError:
+            netD.collect_params().load(_param_file, ctx=devs)  # work with block.export()
         netAdv.load_params(_adv_param_file, ctx=devs)
     else:
         # init
