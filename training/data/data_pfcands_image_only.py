@@ -14,6 +14,7 @@ train_vars['img'] = (
 obs_vars = [
     'orig_fj_labelJMAR', 'orig_fjJMAR_gen_pt', 'orig_fjJMAR_gen_eta', 'orig_fjJMAR_gen_pdgid',
     'orig_fj_labelLegacy',
+    'orig_fj_label',
     'orig_fj_isQCD', 'orig_fj_isTop', 'orig_fj_isW', 'orig_fj_isZ', 'orig_fj_isH',
 
     'orig_fj_pt',

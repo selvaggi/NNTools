@@ -6,16 +6,18 @@ import os
 import logging
 
 label_var = 'label'
-extra_label_vars = ['orig_fjPuppi_corrsdmass']
+extra_label_vars = ['orig_fjPuppi_sdmass', 'orig_fj_pt']  # [mass, pt]
 train_groups = ['part', 'sv']
 train_vars = {}
 train_vars['part'] = (
     # basic kinematics
-    'part_ptrel',
-    'part_erel',
+    'part_pt_log',
+    'part_ptrel_log',
+    'part_erel_log',
     'part_phirel',
     'part_etarel',
     'part_deltaR',
+    'part_abseta',
     'part_puppiw',
 
     'part_drminsv',
@@ -92,12 +94,13 @@ train_vars['part'] = (
     )
 
 train_vars['sv'] = (
-    'sv_ptrel',
-    'sv_erel',
+    'sv_pt_log',
+    'sv_ptrel_log',
+    'sv_erel_log',
     'sv_phirel',
     'sv_etarel',
     'sv_deltaR',
-    'sv_pt',
+    'sv_abseta',
     'sv_mass',
 
     'sv_ntracks',
@@ -110,7 +113,8 @@ train_vars['sv'] = (
     )
 
 obs_vars = [
-    'orig_fj_labelJMAR', 'orig_fjJMAR_gen_pt', 'orig_fjJMAR_gen_eta', 'orig_fjJMAR_gen_pdgid',
+    'orig_event_no',
+#     'orig_fj_labelJMAR', 'orig_fjJMAR_gen_pt', 'orig_fjJMAR_gen_eta', 'orig_fjJMAR_gen_pdgid',
     'orig_fj_isQCD', 'orig_fj_isTop', 'orig_fj_isW', 'orig_fj_isZ', 'orig_fj_isH',
 
     'orig_fj_pt',
@@ -127,10 +131,8 @@ obs_vars = [
     'orig_fj_tau32',
     'orig_npv',
     'orig_n_parts',
-    'orig_n_pfcands',
-    'orig_n_tracks',
     'orig_n_sv',
-    'orig_fjPuppi_tau21', 'orig_fjPuppi_tau32', 'orig_fjPuppi_corrsdmass',
+    'orig_fjPuppi_tau21', 'orig_fjPuppi_tau32', 'orig_fjPuppi_corrsdmass', 'orig_fjPuppi_sdmass',
     'orig_fj_sdsj1_csv', 'orig_fj_sdsj2_csv',
     ]
 

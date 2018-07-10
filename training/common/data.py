@@ -68,13 +68,19 @@ class DataFormat(object):
     @staticmethod
     def num_classes(filename, label_var='label'):
         with tables.open_file(filename) as f:
-            return getattr(f.root, label_var).shape[1]
+            try:
+                return getattr(f.root, label_var).shape[1]
+            except IndexError:
+                return getattr(f.root, label_var)[:].max()
 
     def _parse_file(self, filename):
         self.train_groups_shapes = {}
         with tables.open_file(filename) as f:
-            self.num_classes = getattr(f.root, self.label_var).shape[1]
-            self.class_labels = getattr(f.root, self.label_var).title.split(',')
+            self.num_classes = self.num_classes(filename, self.label_var)
+            if getattr(f.root, self.label_var).title:
+                self.class_labels = getattr(f.root, self.label_var).title.split(',')
+            else:
+                self.class_labels = [self.label_var]
             for v_group in self.train_groups:
                 n_channels = len(self.train_vars[v_group])
                 a = getattr(f.root, self.train_vars[v_group][0])

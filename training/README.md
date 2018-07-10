@@ -33,18 +33,17 @@ mkdir -p $HOME/miniconda2/envs/mxnet/etc/conda/
 cd $HOME/miniconda2/envs/mxnet/etc/conda/
 mkdir activate.d  deactivate.d
 cd activate.d
-# create the env_vars.sh file with the following content:
-# change the ROOT path according to your environment
-# ------
+# create the env_vars.sh file to get ROOT environment
+cat << EOF > env_vars.sh
 #!/bin/sh
-# $HOME/miniconda2/envs/mxnet/etc/conda/activate.d/env_vars.sh
+# $HOME/miniconda2/envs/prep/etc/conda/activate.d/env_vars.sh
 echo "Source root environment..."
 # ROOT
 source /cvmfs/sft.cern.ch/lcg/external/gcc/4.9.1/x86_64-slc6/setup.sh
 cd /cvmfs/sft.cern.ch/lcg/releases/ROOT/6.07.06-7096a/x86_64-slc6-gcc49-opt/
 source bin/thisroot.sh
 cd -
-# ------
+EOF
 
 # activate the environment
 source activate mxnet
@@ -97,3 +96,27 @@ python train_pfcands_simple.py --predict --load-epoch 60 --network resnet_simple
  - `--data-test`: path for the testing files; support Unix style pathname pattern expansion (i.e., `*` and `?`) using `glob` in python, but make sure you wrap it with single quote (`'`).
  - `--predict-output`: output file. Both PyTables (`.h5`) and root file will be created.
 
+### Reference training command
+
+Nominal version (80X, `ver_2018-03-08`)
+
+```bash
+python train_pfcands_simple.py --data-config data_ak8_parts_sv --network sym_ak8_parts_sv_resnet_simple --model-prefix /data/hqu/training/mxnet/models/20180308_ak8puppi/parts_sv_logpt_abseta_resnet_simple/resnet --batch-size 1024 --optimizer adam --lr 0.001 --lr-step-epochs "15,30,40" --num-epochs 50 --data-train '/data/hqu/ntuples/20180308/ak8puppi_parts_gen/train_file_*.h5' --dataloader-nworkers 2 --dataloader-qsize 32 --disp-batches 1000 --gpus 0 &> logs/train_ak8puppi_20180308_parts_sv_logpt_abseta_resnet_simple.log &
+```
+
+Decorrelated version (80X, `ver_2018-03-08`)
+
+```bash
+python train_features_adv.py \
+ --data-config data_ak8_adv_parts_sv \
+ --network block_ak8_adv_resnet_features_r_3x256_parts_sv \
+ --model-prefix /data/hqu/training/mxnet/models/20180308_ak8puppi_adv_minsdmass30/parts_sv_logpt_abseta_uncorrsdmass_resnet_features_r_3x256_mass30to250_22bins_advwgt5_advfreq10_lr_1e-3_advlr_1e-4_batch6k/resnet \
+ --data-train '/data/hqu/ntuples/20180308/ak8puppi_parts_minsdmass30_ptmasswgt/train_file_*.h5' \
+ --dataloader-weight-scale 1 --dataloader-max-resample 100 --dataloader-nworkers 2 --dataloader-qsize 16 \
+ --batch-size 6000 --num-epochs 300 \
+ --optimizer adam --lr 1e-3 --lr-factor 0.1 --lr-step-epochs "1000" \
+ --adv-lr 1e-4 --adv-lr-factor 0.1 --adv-lr-step-epochs "1000" \
+ --adv-lambda 5 --adv-mass-min 30 --adv-mass-max 250 --adv-mass-nbins 22 --adv-train-freq 10 \
+ --gpus 1 --disp-batches 100 \
+ &> logs/dev-adv-ak8puppi_20180308_minsdmass30_ptmasswgt_parts_sv_logpt_abseta_uncorrsdmass_resnet_features_r_3x256_mass30to250_22bins_advwgt5_advfreq10_lr_1e-3_advlr_1e-4_batch6k.log &
+```

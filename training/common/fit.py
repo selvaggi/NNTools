@@ -319,6 +319,7 @@ def predict(args, data_loader, **kwargs):
 
     if args.predict_all:
         import re
+        import glob
         test_input = re.sub(r'\/JMAR.*\/.*\/', '/_INPUT_/', args.data_test)
         pred_output = re.sub(r'\/JMAR.*\/.+h5', '/_OUTPUT_', args.predict_output)
         for a in ['JMAR', 'JMAR_lowM']:
@@ -326,6 +327,9 @@ def predict(args, data_loader, **kwargs):
                 if a == 'JMAR_lowM' and b == 'QCD': b = 'QCD_Flat'
                 args.data_test = test_input.replace('_INPUT_', '%s/%s' % (a, b))
                 args.predict_output = pred_output.replace('_OUTPUT_', '%s/mx-pred_%s.h5' % (a, b))
+                if len(glob.glob(args.data_test)) == 0:
+                    logging.warning('No files found in %s, ignoring...', args.data_test)
+                    continue
                 _predict(args)
     else:
         _predict(args)
