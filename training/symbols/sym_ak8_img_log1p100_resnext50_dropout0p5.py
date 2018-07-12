@@ -117,6 +117,8 @@ def resnext(input_name, units, filter_list, height=1, bottle_neck=True, num_grou
         body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(3, k_h), stride=(1, 1), pad=(1, 0),
                               no_bias=True, name="%s_conv0" % input_name, workspace=workspace)
     else:
+        data = mx.sym.log1p(100 * data, name='%s_log1p' % input_name)  # !!!
+
         body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(7, 7), stride=(2, 2), pad=(3, 3),
                               no_bias=True, name="%s_conv0" % input_name, workspace=workspace)
         body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=2e-5, momentum=bn_mom, name='bn0')
@@ -149,7 +151,8 @@ def get_subnet(input_name, height=1, filter_list=[64, 128, 256, 512, 1024], bott
 def get_symbol(num_classes, **kwargs):
 
     pfcand = get_subnet(input_name='img', height=3, filter_list=[64, 64, 128, 256, 512], bottle_neck=True, units=[3, 4, 6, 3])
-    fc_out = mx.sym.FullyConnected(pfcand, num_hidden=num_classes, name='fc_out')
+    pf_dropout = mx.sym.Dropout(pfcand, p=0.5, name='pf_dropout')
+    fc_out = mx.sym.FullyConnected(pf_dropout, num_hidden=num_classes, name='fc_out')
     softmax = mx.sym.SoftmaxOutput(data=fc_out, name='softmax')
 
     return softmax
