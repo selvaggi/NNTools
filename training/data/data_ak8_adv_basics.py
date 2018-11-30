@@ -132,5 +132,5 @@ def dump_input_metadata(orig_metadata, groups, shapes, var_names, output='inputs
     out['var_names'] = var_names
 #     print(out)
     with open(output, 'w') as f:
-        json.dump(out, f, indent=2, sort_keys=True, encoding='ascii')
+        json.dump(out, f, indent=2, sort_keys=True)
     logging.info('Output json file to %s' % output)

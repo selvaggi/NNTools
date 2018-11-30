@@ -345,7 +345,7 @@ class PyTableEnqueuer(object):
         self._file_indices = None
         self._idx = None
 
-class DataLoader(object):
+class DataLoader(mx.io.DataIter):
     def __init__(self, filelist, data_format, batch_size, shuffle=True, predict_mode=False, fetch_size=600000, up_sample=True, one_hot_label=False, args=None):
         self._data_format = data_format
         self._batch_size = batch_size

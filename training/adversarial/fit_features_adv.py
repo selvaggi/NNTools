@@ -46,7 +46,7 @@ def _save_model(args, epoch, netD, netAdv, symD, symAdv, softmax=None):
         os.makedirs(dst_dir)
 
     model_prefix = args.model_prefix
-    if softmax:
+    if softmax is not None:
         softmax.save('%s-symbol-softmax.json' % model_prefix)
 
     param_name = '%s-%04d.params' % (model_prefix, epoch)
@@ -55,7 +55,7 @@ def _save_model(args, epoch, netD, netAdv, symD, symAdv, softmax=None):
     logging.info('Saving model parameter to %s' % param_name)
 
     adv_param_name = '%s-adv-%04d.params' % (model_prefix, epoch)
-    netAdv.save_params(adv_param_name)
+    netAdv.save_parameters(adv_param_name)
     logging.info('Saving adversarial net parameter to %s' % adv_param_name)
 
 def add_fit_args(parser):
@@ -174,10 +174,10 @@ def fit(args, symbol, data_loader, **kwargs):
         assert symSoftmax.tojson() == _softmaxD.tojson()
 #         assert symAdv.tojson() == _symAdv.tojson()
         try:
-            netD.load_params(_param_file, ctx=devs)  # works with block.save_params()
+            netD.load_parameters(_param_file, ctx=devs)  # works with block.save_parameters()
         except AssertionError:
             netD.collect_params().load(_param_file, ctx=devs)  # work with block.export()
-        netAdv.load_params(_adv_param_file, ctx=devs)
+        netAdv.load_parameters(_adv_param_file, ctx=devs)
     else:
         # init
         netD.collect_params().initialize(mx.init.Xavier(rnd_type='gaussian', factor_type="in", magnitude=2), ctx=devs)
@@ -238,7 +238,7 @@ def fit(args, symbol, data_loader, **kwargs):
     ################################################################################
     train_data, eval_data = train, val
     for epoch in range(args.num_epochs):
-        if epoch <= args.load_epoch:
+        if args.load_epoch is not None and epoch <= args.load_epoch:
             continue
 
         if lr_getter:
@@ -424,7 +424,7 @@ def predict(args, symbol, data_loader, **kwargs):
             print(_softmaxD.tojson())
             raise RuntimeError
         try:
-            netD.load_params(_param_file, ctx=devs)  # works with block.save_params()
+            netD.load_parameters(_param_file, ctx=devs)  # works with block.save_parameters()
         except AssertionError:
             netD.collect_params().load(_param_file, ctx=devs)  # work with block.export()
 

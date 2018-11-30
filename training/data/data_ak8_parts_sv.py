@@ -113,7 +113,7 @@ train_vars['sv'] = (
 
 obs_vars = [
     'orig_event_no',
-    'orig_fj_labelJMAR', 'orig_fjJMAR_gen_pt', 'orig_fjJMAR_gen_eta', 'orig_fjJMAR_gen_pdgid',
+#    'orig_fj_labelJMAR', 'orig_fjJMAR_gen_pt', 'orig_fjJMAR_gen_eta', 'orig_fjJMAR_gen_pdgid',
     'orig_fj_isQCD', 'orig_fj_isTop', 'orig_fj_isW', 'orig_fj_isZ', 'orig_fj_isH',
 
     'orig_fj_pt',
@@ -198,5 +198,5 @@ def dump_input_metadata(orig_metadata, groups, shapes, var_names, output='inputs
     out['var_names'] = var_names
 #     print(out)
     with open(output, 'w') as f:
-        json.dump(out, f, indent=2, sort_keys=True, encoding='ascii')
+        json.dump(out, f, indent=2, sort_keys=True)
     logging.info('Output json file to %s' % output)
