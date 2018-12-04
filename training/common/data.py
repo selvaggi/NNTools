@@ -86,10 +86,10 @@ class DataFormat(object):
                 a = getattr(f.root, self.train_vars[v_group][0])
                 if a.ndim == 3:
                     # (n, W, H)
-                    width, height = a.shape[1:]
+                    width, height = int(a.shape[1]), int(a.shape[2])
                 elif a.ndim == 2:
                     # (n, W)
-                    width, height = a.shape[1], 1
+                    width, height = int(a.shape[1]), 1
                 elif a.ndim == 1:
                     # (n,)
                     width, height = 1, 1
