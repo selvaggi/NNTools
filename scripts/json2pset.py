@@ -41,6 +41,10 @@ parser.add_argument('-i', '--input',
 parser.add_argument('-o', '--output',
     help='Output file.'
 )
+parser.add_argument('-n', '--name',
+    default='pfDeepBoostedJetPreprocessParams',
+    help='Params name.'
+)
 args = parser.parse_args()
 
 with open(args.input) as fp:
@@ -48,6 +52,12 @@ with open(args.input) as fp:
 
 cfg = cms.PSet()
 cfg.input_names = cms.vstring(*j['input_names'])
+
+try:
+    scale_method = j['scale_method']
+except KeyError:
+    scale_method = 'upper'
+    print('scale_method not found! Use `upper` by default.')
 
 for name in j['input_names']:
     p = cms.PSet(
@@ -60,12 +70,20 @@ for name in j['input_names']:
     
     for v in j['var_names'][name]:
         info = j['var_info'][v]
+        if scale_method == 'upper':
+            scale = info['upper'] - info['median']
+        elif scale_method == 'max':
+            scale = max(info['upper'] - info['median'], info['median'] - info['lower'])
+        else:
+            raise NotImplemented('scale_method=%s is not implemented!' % scale_method)
+        if scale == 0:
+            scale = 1
         pvar = cms.PSet(
             median=cms.double(info['median']),
-            upper=cms.double(info['upper']),
+            norm_factor=cms.double(1. / scale),
             )
         setattr(p.var_infos, v, pvar)
 
 with open(args.output, 'w') as fout:
     fout.write('import FWCore.ParameterSet.Config as cms\n\n')
-    fout.write('pfDeepBoostedJetPreprocessParams = '+str(cfg))
+    fout.write(args.name + ' = ' + str(cfg))
