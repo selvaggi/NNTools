@@ -106,3 +106,23 @@ python runPreprocessing.py -n 50000 /eos/cms/store/path/to/JMAR_sample/JMAR/Zpri
  - Specify the path for the Top sample as the input path, and output the files to the `Top` directory.
  - `--remake-filelist` option is needed to update the input file list using the specified input directory (otherwise the input files in the metadata file will be used).
  - `--jobdir` opetion sets the directory for job-related files (submission script, logs, etc.). Set different job dirs if you are runnning multiple jobs at the same time.
+
+
+### Reference preprocessing command
+
+For nominal tagger training (94X, `20190326`)
+
+```bash
+python runPreprocessing.py -n 200000 /eos/cms/store/cmst3/group/deepjet/ak8/ntuples/94X/20190326_ak8_links /eos/cms/store/cmst3/group/deepjet/ak8/hqu/20190326_ak8/ak8puppi_parts --data-format "ak8_list" --jobdir ak8puppi_parts_20190326 &> ak8puppi_parts_list_20190326.log &
+```
+
+For decorrelated tagger training (94X, `20190326`)
+
+```bash
+# start with the same json to reuse the preprocessing parameters (median, lower/upper ranges)
+# this would allow us to use the same testing files for both nominal tagger and the mass-decorrelated tagger
+mkdir /eos/cms/store/cmst3/group/deepjet/ak8/hqu/20190326_ak8/ak8puppi_parts_ptmasswgt
+cp /eos/cms/store/cmst3/group/deepjet/ak8/hqu/20190326_ak8/ak8puppi_parts/metadata.json /eos/cms/store/cmst3/group/deepjet/ak8/hqu/20190326_ak8/ak8puppi_parts_ptmasswgt
+
+python runPreprocessing.py -n 200000 /eos/cms/store/cmst3/group/deepjet/ak8/ntuples/94X/20190326_ak8_links /eos/cms/store/cmst3/group/deepjet/ak8/hqu/20190326_ak8/ak8puppi_parts_ptmasswgt --data-format "ak8_list_ptmasswgt" --jobdir ak8puppi_parts_ptmasswgt_20190326 --remake-filelist --remake-weights &> ak8puppi_parts_list_ptmasswgt_20190326.log &
+```
