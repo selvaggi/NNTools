@@ -101,27 +101,54 @@ python train_pfcands_simple.py --data-config data_ak8_parts_sv --network resnet_
  - `--data-test`: path for the testing files; support Unix style pathname pattern expansion (i.e., `*` and `?`) using `glob` in python, but make sure you wrap it with single quote (`'`).
  - `--predict-output`: output file. Both PyTables (`.h5`) and root file will be created.
 
-### Reference training command
+### Reference training/prediction command
 
-Nominal version (80X, `ver_2018-03-08`)
+Nominal version (94X, `V1`)
+
+Training:
 
 ```bash
-python train_pfcands_simple.py --data-config data_ak8_parts_sv --network sym_ak8_parts_sv_resnet_simple --model-prefix /data/hqu/training/mxnet/models/20180308_ak8puppi/parts_sv_logpt_abseta_resnet_simple/resnet --batch-size 1024 --optimizer adam --lr 0.001 --lr-step-epochs "15,30,40" --num-epochs 50 --data-train '/data/hqu/ntuples/20180308/ak8puppi_parts_gen/train_file_*.h5' --dataloader-nworkers 2 --dataloader-qsize 32 --disp-batches 1000 --gpus 0 &> logs/train_ak8puppi_20180308_parts_sv_logpt_abseta_resnet_simple.log &
+python train_pfcands_simple.py --data-config data_ak8_pfcand_sv --network sym_ak8_pfcand_sv_resnet_v1 --model-prefix /data/hqu/training/mxnet/models/20190326_ak8_classrewgt/pfcand_sv_resnet_v1/resnet --batch-size 1024 --optimizer adam --lr 0.001 --lr-step-epochs "15,30,40" --num-epochs 50 --data-train '/data/hqu/ntuples/20190326_ak8/ak8puppi_parts_classrewgt/train_file_*.h5' --train-val-split 0.9 --dataloader-nworkers 3 --dataloader-qsize 48 --disp-batches 1000 --gpus 0 &> logs/train_ak8puppi_20190326_classrewgt_pfcand_sv_ref_resnet_v1.log &
 ```
 
-Decorrelated version (80X, `ver_2018-03-08`)
+Prediction:
+
+```bash
+python train_pfcands_simple.py --data-config data_ak8_pfcand_sv --network sym_ak8_pfcand_sv_resnet_v1 --model-prefix /data/hqu/training/mxnet/models/20190326_ak8_classrewgt/pfcand_sv_resnet_v1/resnet --load-epoch 39 --batch-size 128 --data-train '/data/hqu/ntuples/20190326_ak8/ak8puppi_parts_classrewgt/train_file_*.h5' --data-test '/data/hqu/ntuples/20190326_ak8/test_samples/JMAR/QCD/train_file_*.h5' --predict-output /data/hqu/training/mxnet/predict/20190326_ak8_classrewgt/pfcand_sv_resnet_v1/epoch39/JMAR/mx-pred_QCD.h5 --dataloader-nworkers 2 --dataloader-qsize 16 --gpus 0 --predict --predict-all &> logs/preds/pred_ak8puppi_20190326_classrewgt_pfcand_sv_ref_resnet_simple_epoch39.log &
+```
+
+
+Decorrelated version (94X, `V1`)
+
+Training:
 
 ```bash
 python train_features_adv.py \
- --data-config data_ak8_adv_parts_sv \
- --network block_ak8_adv_resnet_features_r_3x256_parts_sv \
- --model-prefix /data/hqu/training/mxnet/models/20180308_ak8puppi_adv_minsdmass30/parts_sv_logpt_abseta_uncorrsdmass_resnet_features_r_3x256_mass30to250_22bins_advwgt5_advfreq10_lr_1e-3_advlr_1e-4_batch6k/resnet \
- --data-train '/data/hqu/ntuples/20180308/ak8puppi_parts_minsdmass30_ptmasswgt/train_file_*.h5' \
+ --data-config data_ak8_adv_pfcand_sv \
+ --network block_ak8_adv_resnet_features_r_3x256_pfcand_sv_dropout \
+ --model-prefix /data/hqu/training/mxnet/models/20190326_ak8_adv/pfcand_sv_resnet_features_r_3x256_dropout_mass30to250_22bins_advwgt5_advfreq10_lr_1e-2_decay0p1_30_60_90_advlr_1e-4_batch8k/resnet \
+ --data-train '/data/hqu/ntuples/20190326_ak8/ak8puppi_parts_ptmasswgt/train_file_*.h5' \
  --dataloader-weight-scale 1 --dataloader-max-resample 100 --dataloader-nworkers 2 --dataloader-qsize 16 \
- --batch-size 6000 --num-epochs 300 \
- --optimizer adam --lr 1e-3 --lr-factor 0.1 --lr-step-epochs "1000" \
+ --batch-size 8192 --num-epochs 120 --train-val-split 0.9 \
+ --optimizer adam --lr 1e-2 --lr-factor 0.1 --lr-step-epochs "30,60,90" \
  --adv-lr 1e-4 --adv-lr-factor 0.1 --adv-lr-step-epochs "1000" \
  --adv-lambda 5 --adv-mass-min 30 --adv-mass-max 250 --adv-mass-nbins 22 --adv-train-freq 10 \
+ --gpus 0 --disp-batches 100 \
+ &> logs/dev-adv-ak8puppi_20190326_ptmasswgt_pfcand_sv_resnet_features_r_3x256_dropout_mass30to250_22bins_advwgt5_advfreq10_lr_1e-2_decay0p1_30_60_90_advlr_1e-4_batch8k.log &
+```
+
+Prediction:
+
+```bash
+python train_features_adv.py \
+ --data-config data_ak8_adv_pfcand_sv \                                     
+ --network block_ak8_adv_resnet_features_r_3x256_pfcand_sv_dropout \
+ --model-prefix /data/hqu/training/mxnet/models/20190326_ak8_adv/pfcand_sv_resnet_features_r_3x256_dropout_mass30to250_22bins_advwgt5_advfreq10_lr_1e-2_decay0p1_30_60_90_advlr_1e-4_batch8k/resnet \
+ --data-train '/data/hqu/ntuples/20190326_ak8/ak8puppi_parts_ptmasswgt/train_file_*.h5' \
+ --dataloader-nworkers 2 --dataloader-qsize 16 \
+ --batch-size 128 --data-test '/data/hqu/ntuples/20190326_ak8/test_samples/JMAR/QCD/train_file_*.h5' \
+ --load-epoch 50 --predict-output /data/hqu/training/mxnet/predict/20190326_ak8_adv/pfcand_sv_resnet_features_r_3x256_dropout_mass30to250_22bins_advwgt5_advfreq10_lr_1e-2_decay0p1_30_60_90_advlr_1e-4_batch8k/JMAR/mx-pred_QCD.h5 \
+ --predict --predict-all --predict-epochs "70,99,119" \
  --gpus 1 --disp-batches 100 \
- &> logs/dev-adv-ak8puppi_20180308_minsdmass30_ptmasswgt_parts_sv_logpt_abseta_uncorrsdmass_resnet_features_r_3x256_mass30to250_22bins_advwgt5_advfreq10_lr_1e-3_advlr_1e-4_batch6k.log &
+ &> logs/preds/preds-adv-ak8puppi_20190326_ptmasswgt_pfcand_sv_resnet_features_r_3x256_dropout_mass30to250_22bins_advwgt5_advfreq10_lr_1e-2_decay0p1_30_60_90_advlr_1e-4_batch8k_epoch_70_99_119.log &
 ```
