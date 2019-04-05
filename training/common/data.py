@@ -30,7 +30,7 @@ def add_data_args(parser):
     return data
 
 class DataFormat(object):
-    def __init__(self, train_groups, train_vars, label_var, wgtvar, obs_vars=[], extra_label_vars=[], sort_by=None, filename=None, plotting_mode=False):
+    def __init__(self, train_groups, train_vars, label_var, wgtvar, obs_vars=[], extra_label_vars=[], sort_by=None, filename=None, plotting_mode=False, train_var_range=None):
         self.train_groups = train_groups  # list
         self.train_vars = train_vars  # dict
         self.sort_by = sort_by  # dict {v_group:{'var':x, 'descend':False}}
@@ -38,16 +38,19 @@ class DataFormat(object):
         self.wgtvar = wgtvar  # set to None if not using weights
         self.obs_vars = obs_vars  # list
         self.extra_label_vars = extra_label_vars  # list
-        self._set_range(plotting_mode)
+        self._set_range(plotting_mode, train_var_range)
         self._parse_file(filename)
 
-    def _set_range(self, plotting_mode):
+    def _set_range(self, plotting_mode, train_var_range):
         # weight/var range
         self.WEIGHT_MIN = 0.
         self.WEIGHT_MAX = 1.
         if not plotting_mode:
-            self.VAR_MIN = -5.
-            self.VAR_MAX = 5.
+            if train_var_range is None:
+                self.VAR_MIN = -5.
+                self.VAR_MAX = 5.
+            else:
+                self.VAR_MIN, self.VAR_MAX = train_var_range
         else:
             self.VAR_MIN = -1e99
             self.VAR_MAX = 1e99
@@ -345,6 +348,7 @@ class PyTableEnqueuer(object):
         self._file_indices = None
         self._idx = None
 
+
 class DataLoader(mx.io.DataIter):
     def __init__(self, filelist, data_format, batch_size, shuffle=True, predict_mode=False, fetch_size=600000, up_sample=True, one_hot_label=False, args=None):
         self._data_format = data_format
@@ -366,7 +370,7 @@ class DataLoader(mx.io.DataIter):
         for v in self._data_format.extra_label_vars:
             self._provide_label.append(('label_' + v, (batch_size,)))
 
-        h5_samples = sum([DataFormat.nevts(filename) for filename in filelist])
+        h5_samples = sum([DataFormat.nevts(filename, self._data_format.label_var) for filename in filelist])
         self.steps_per_epoch = h5_samples // batch_size
 
         if not self.args.syn_data:
@@ -434,6 +438,7 @@ class DataLoader(mx.io.DataIter):
                 time.sleep(self._wait_time)
 
         if generator_output is None:
+            self.enqueuer.stop()
             raise StopIteration
 
         X_batch, y_batch, ext_batch, Z_batch = generator_output

@@ -108,6 +108,8 @@ def add_fit_args(parser):
                        help='run all predictions')
     train.add_argument('--predict-output', type=str,
                        help='predict output')
+    train.add_argument('--predict-epochs', type=str,
+                       help='epochs to run predictions, e.g., 30,50')
     train.add_argument('--adv-lambda', type=float, default=10.,
                        help='weight of adversarial loss')
     train.add_argument('--adv-qcd-start-label', type=int, default=12,
@@ -416,19 +418,23 @@ def predict(args, symbol, data_loader, **kwargs):
     # load model
     netD, netAdv, symD, symAdv, symSoftmax = symbol.get_net(data_iter._data_format.num_classes, use_softmax=True, **vars(args))
 
-    _softmaxD, _symAdv, _param_file, _adv_param_file = _load_model(args)
-    if _softmaxD is not None:
-        if symSoftmax.tojson() != _softmaxD.tojson():
-            print(symSoftmax.tojson())
-            print('-' * 50)
-            print(_softmaxD.tojson())
-            raise RuntimeError
-        try:
-            netD.load_parameters(_param_file, ctx=devs)  # works with block.save_parameters()
-        except AssertionError:
-            netD.collect_params().load(_param_file, ctx=devs)  # work with block.export()
+    def _predict(args):
+        # data iterators
+        data_iter = data_loader(args)
 
-    def _predict(data_iter, outpath):
+        _softmaxD, _symAdv, _param_file, _adv_param_file = _load_model(args)
+        if _softmaxD is not None:
+            if symSoftmax.tojson() != _softmaxD.tojson():
+                print(symSoftmax.tojson())
+                print('-' * 50)
+                print(_softmaxD.tojson())
+                logging.warning('Inconsistent json!')
+                raise RuntimeError
+            try:
+                netD.load_parameters(_param_file, ctx=devs)  # works with block.save_parameters()
+            except AssertionError:
+                netD.collect_params().load(_param_file, ctx=devs)  # work with block.export()
+
         # prediction loop
         preds = []
         for eval_batch in data_iter:
@@ -457,33 +463,37 @@ def predict(args, symbol, data_loader, **kwargs):
 
         import pandas as pd
         df = pd.DataFrame(pred_output)
-        if outpath:
-            logging.info('Write prediction file to %s' % outpath)
-            outdir = os.path.dirname(outpath)
+        if args.predict_output:
+            logging.info('Write prediction file to %s' % args.predict_output)
+            outdir = os.path.dirname(args.predict_output)
             if not os.path.exists(outdir):
                 os.makedirs(outdir)
-            df.to_hdf(outpath, 'Events', format='table')
+#             df.to_hdf(args.predict_output, 'Events', format='table')
 
             from common.util import plotROC
             plotROC(preds, truths, output=os.path.join(outdir, 'roc.pdf'))
 
             from root_numpy import array2root
-            array2root(df.to_records(index=False), filename=outpath.rsplit('.', 1)[0] + '.root', treename='Events', mode='RECREATE')
+            array2root(df.to_records(index=False), filename=args.predict_output.rsplit('.', 1)[0] + '.root', treename='Events', mode='RECREATE')
+
+    epochs = [args.load_epoch]
+    if args.predict_epochs:
+        epochs = [int(i) for i in args.predict_epochs.split(',')]
 
     if args.predict_all:
         import re
         import glob
         test_input = re.sub(r'\/JMAR.*\/.*\/', '/_INPUT_/', args.data_test)
         pred_output = re.sub(r'\/JMAR.*\/.+h5', '/_OUTPUT_', args.predict_output)
-        for a in ['JMAR', 'JMAR_lowM']:
-            for b in ['Top', 'W', 'Z', 'Higgs', 'QCD']:
-                if a == 'JMAR_lowM' and b == 'QCD': b = 'QCD_Flat'
-                args.data_test = test_input.replace('_INPUT_', '%s/%s' % (a, b))
-                args.predict_output = pred_output.replace('_OUTPUT_', '%s/mx-pred_%s.h5' % (a, b))
-                if len(glob.glob(args.data_test)) == 0:
-                    logging.warning('No files found in %s, ignoring...', args.data_test)
-                    continue
-                data_iter = data_loader(args)
-                _predict(data_iter, args.predict_output)
+        for epoch in epochs:
+            args.load_epoch = epoch
+            for a in ['JMAR', 'JMAR_lowM']:
+                for b in ['Top', 'W', 'Z', 'Higgs', 'Hbb', 'Hcc', 'H4q', 'QCD', 'QCD_Flat']:
+                    args.data_test = test_input.replace('_INPUT_', '%s/%s' % (a, b))
+                    args.predict_output = pred_output.replace('_OUTPUT_', 'epoch%d/%s/mx-pred_%s.h5' % (epoch, a, b))
+                    if len(glob.glob(args.data_test)) == 0:
+                        logging.warning('No files found in %s, ignoring...', args.data_test)
+                        continue
+                    _predict(args)
     else:
-        _predict(data_iter, args.predict_output)
+        _predict(args)

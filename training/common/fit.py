@@ -289,7 +289,10 @@ def predict(args, data_loader, **kwargs):
     def _predict(args):
         data_iter = data_loader(args)
 
+        tic = time.time()
         preds = model.predict(data_iter).asnumpy()
+        logging.info('Speed: %.2f samples/sec' % (1.*preds.shape[0] / (time.time() - tic)))
+
         truths = data_iter.get_truths()
         observers = data_iter.get_observers()
 
@@ -309,7 +312,7 @@ def predict(args, data_loader, **kwargs):
             outdir = os.path.dirname(args.predict_output)
             if not os.path.exists(outdir):
                 os.makedirs(outdir)
-            df.to_hdf(args.predict_output, 'Events', format='table')
+#             df.to_hdf(args.predict_output, 'Events', format='table')
 
             from common.util import plotROC
             plotROC(preds, truths, output=os.path.join(outdir, 'roc.pdf'))
@@ -323,8 +326,7 @@ def predict(args, data_loader, **kwargs):
         test_input = re.sub(r'\/JMAR.*\/.*\/', '/_INPUT_/', args.data_test)
         pred_output = re.sub(r'\/JMAR.*\/.+h5', '/_OUTPUT_', args.predict_output)
         for a in ['JMAR', 'JMAR_lowM']:
-            for b in ['Top', 'W', 'Z', 'Higgs', 'QCD']:
-                if a == 'JMAR_lowM' and b == 'QCD': b = 'QCD_Flat'
+            for b in ['Top', 'W', 'Z', 'Higgs', 'Hbb', 'Hcc', 'H4q', 'QCD', 'QCD_Flat']:
                 args.data_test = test_input.replace('_INPUT_', '%s/%s' % (a, b))
                 args.predict_output = pred_output.replace('_OUTPUT_', '%s/mx-pred_%s.h5' % (a, b))
                 if len(glob.glob(args.data_test)) == 0:
