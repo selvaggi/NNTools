@@ -40,6 +40,7 @@ def create_metadata(args):
                   reweight_var=d.reweight_var,
                   reweight_classes=d.reweight_classes,
                   reweight_method=d.reweight_method,
+                  scale_method=getattr(d, 'scale_method', 'upper'),
                   var_img=d.var_img,
                   var_pos=d.var_pos,
                   n_pixels=d.n_pixels,
@@ -51,7 +52,7 @@ def update_metadata(args):
     create_metadata(args)
     from importlib import import_module
     d = import_module('data_formats.' + args.data_format)
-    md = Metadata(args.inputdir,
+    md = Metadata(inputdir=args.inputdir,
                   treename=d.treename,
                   reweight_events=d.reweight_events,
                   reweight_bins=d.reweight_bins,
@@ -63,12 +64,14 @@ def update_metadata(args):
                   label_list=d.label_list,
                   reweight_var=d.reweight_var,
                   reweight_classes=d.reweight_classes,
+                  reweight_method=d.reweight_method,
+                  scale_method=getattr(d, 'scale_method', 'upper'),
                   var_img=d.var_img,
                   var_pos=d.var_pos,
                   n_pixels=d.n_pixels,
                   img_ranges=d.img_ranges,
                   )
-    md.loadMetadata(os.path.join(args.outputdir, args.metadata))
+    md.loadMetadata(os.path.join(args.outputdir, args.metadata), override=False)
     if args.remake_filelist:
         md.updateFilelist(args.test_sample)
     if args.remake_weights:
@@ -159,6 +162,7 @@ exit $status
 universe              = vanilla
 requirements          = (Arch == "X86_64") && (OpSys == "LINUX")
 request_disk          = 10000000
+request_memory        = 8192
 executable            = {scriptfile}
 arguments             = $(jobid)
 transfer_input_files  = {metadatafile}

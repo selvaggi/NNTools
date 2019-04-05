@@ -5,12 +5,15 @@ Description on how to produce metadata file.
 input_filter = r'Tau|htata'
 treename = 'deepntuplizer/tree'
 reweight_events = -1
-reweight_bins = [list(range(200, 2051, 50)), list(range(30, 251, 10))]
+reweight_bins = [
+    [200, 251, 316, 398, 501, 630, 793, 997, 1255, 1579, 1987, 2499],  # pt: np.exp(np.linspace(np.log(200), np.log(2500), 12)).astype(np.int32)
+    list(range(30, 251, 10))  # mass
+    ]
 metadata_events = 1000000
-selection = '''jet_tightId && fjPuppi_corrsdmass>30'''
+selection = '''jet_tightId && fj_sdmass_fromsubjets>30'''
 var_groups = {
     # 'group_name': ( ('regex1', 'regex2', ...), list_length )
-    'part': (('part_',), 100),
+    'pfcand': (('pfcand_',), 100),
     'sv': (('sv_',), 7),
     }
 var_blacklist = [
@@ -20,9 +23,11 @@ var_blacklist = [
     'fj_isBB',
     'fj_isNonBB',
 
-    'n_parts',
+    'n_pfcands',
     'n_tracks',
     'n_sv',
+
+    'pfcand_btagJetDistSig',
     ]
 var_no_transform_branches = [
     'event_no',
@@ -30,39 +35,70 @@ var_no_transform_branches = [
     'fj_label',
     'fj_isQCD', 'fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH',
     'npv',
-    'n_parts', 'n_sv',
+    'n_pfcands', 'n_sv',
     'fj_pt', 'fj_eta', 'fj_phi', 'fj_mass',
     'fj_n_sdsubjets', 'fj_nbHadrons', 'fj_ncHadrons',
-    'fjPuppi_tau21', 'fjPuppi_tau32', 'fjPuppi_corrsdmass', 'fjPuppi_sdmass',
-    'fj_doubleb', 'pfCombinedInclusiveSecondaryVertexV2BJetTags',
-    'fj_genjet_pt', 'fj_genOverReco_pt', 'fj_genOverReco_pt_null',
-    'fj_genjet_mass', 'fj_genOverReco_mass', 'fj_genOverReco_mass_null',
-    'fj_genjet_sdmass', 'fj_genjet_sdmass_sqrt', 'fj_genOverReco_sdmass', 'fj_genOverReco_sdmass_null',
+    'fj_doubleb',
+
+    'pfDeepBoostedJetTags_probTbcq',
+    'pfDeepBoostedJetTags_probTbqq',
+    'pfDeepBoostedJetTags_probTbc',
+    'pfDeepBoostedJetTags_probTbq',
+    'pfDeepBoostedJetTags_probWcq',
+    'pfDeepBoostedJetTags_probWqq',
+    'pfDeepBoostedJetTags_probZbb',
+    'pfDeepBoostedJetTags_probZcc',
+    'pfDeepBoostedJetTags_probZqq',
+    'pfDeepBoostedJetTags_probHbb',
+    'pfDeepBoostedJetTags_probHcc',
+    'pfDeepBoostedJetTags_probHqqqq',
+    'pfDeepBoostedJetTags_probQCDbb',
+    'pfDeepBoostedJetTags_probQCDcc',
+    'pfDeepBoostedJetTags_probQCDb',
+    'pfDeepBoostedJetTags_probQCDc',
+    'pfDeepBoostedJetTags_probQCDothers',
+    'pfDeepBoostedDiscriminatorsJetTags_TvsQCD',
+    'pfDeepBoostedDiscriminatorsJetTags_WvsQCD',
+    'pfDeepBoostedDiscriminatorsJetTags_ZvsQCD',
+    'pfDeepBoostedDiscriminatorsJetTags_ZbbvsQCD',
+    'pfDeepBoostedDiscriminatorsJetTags_HbbvsQCD',
+    'pfDeepBoostedDiscriminatorsJetTags_H4qvsQCD',
+    'pfMassDecorrelatedDeepBoostedJetTags_probTbcq',
+    'pfMassDecorrelatedDeepBoostedJetTags_probTbqq',
+    'pfMassDecorrelatedDeepBoostedJetTags_probTbc',
+    'pfMassDecorrelatedDeepBoostedJetTags_probTbq',
+    'pfMassDecorrelatedDeepBoostedJetTags_probWcq',
+    'pfMassDecorrelatedDeepBoostedJetTags_probWqq',
+    'pfMassDecorrelatedDeepBoostedJetTags_probZbb',
+    'pfMassDecorrelatedDeepBoostedJetTags_probZcc',
+    'pfMassDecorrelatedDeepBoostedJetTags_probZqq',
+    'pfMassDecorrelatedDeepBoostedJetTags_probHbb',
+    'pfMassDecorrelatedDeepBoostedJetTags_probHcc',
+    'pfMassDecorrelatedDeepBoostedJetTags_probHqqqq',
+    'pfMassDecorrelatedDeepBoostedJetTags_probQCDbb',
+    'pfMassDecorrelatedDeepBoostedJetTags_probQCDcc',
+    'pfMassDecorrelatedDeepBoostedJetTags_probQCDb',
+    'pfMassDecorrelatedDeepBoostedJetTags_probQCDc',
+    'pfMassDecorrelatedDeepBoostedJetTags_probQCDothers',
+    'pfMassDecorrelatedDeepBoostedDiscriminatorsJetTags_TvsQCD',
+    'pfMassDecorrelatedDeepBoostedDiscriminatorsJetTags_WvsQCD',
+    'pfMassDecorrelatedDeepBoostedDiscriminatorsJetTags_ZHbbvsQCD',
+    'pfMassDecorrelatedDeepBoostedDiscriminatorsJetTags_ZHccvsQCD',
+    'pfMassDecorrelatedDeepBoostedDiscriminatorsJetTags_bbvsLight',
+    'pfMassDecorrelatedDeepBoostedDiscriminatorsJetTags_ccvsLight',
+
+    'pfDeepDoubleBvLJetTags_probHbb',
+    'pfDeepDoubleCvBJetTags_probHcc',
+    'pfDeepDoubleCvLJetTags_probHcc',
+    'pfMassIndependentDeepDoubleBvLJetTags_probHbb',
+    'pfMassIndependentDeepDoubleCvBJetTags_probHcc',
+    'pfMassIndependentDeepDoubleCvLJetTags_probHcc',
 
     "fj_tau21",
     "fj_tau32",
     "fj_sdmass",
-    "fj_sdsj1_pt",
-    "fj_sdsj1_eta",
-    "fj_sdsj1_phi",
-    "fj_sdsj1_mass",
-    "fj_sdsj1_csv",
-    "fj_sdsj1_ptD",
-    "fj_sdsj1_axis1",
-    "fj_sdsj1_axis2",
-    "fj_sdsj1_mult",
-    "fj_sdsj2_pt",
-    "fj_sdsj2_eta",
-    "fj_sdsj2_phi",
-    "fj_sdsj2_mass",
-    "fj_sdsj2_csv",
-    "fj_sdsj2_ptD",
-    "fj_sdsj2_axis1",
-    "fj_sdsj2_axis2",
-    "fj_sdsj2_mult",
-    "fj_ptDR",
-    "fj_relptdiff",
-    "fj_sdn2",
+    "fj_sdmass_fromsubjets",
+    "fj_corrsdmass",
 
     'fj_z_ratio',
     'fj_trackSipdSig_3',
@@ -92,22 +128,22 @@ var_no_transform_branches = [
     'fj_jetNTracks',
     'fj_nSV',
     ]
-# label_list = ['fj_isQCD', 'fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH']
 label_list = ['label_Top_bcq', 'label_Top_bqq', 'label_Top_bc', 'label_Top_bq',
               'label_W_cq', 'label_W_qq',
               'label_Z_bb', 'label_Z_cc', 'label_Z_qq',
               'label_H_bb', 'label_H_cc', 'label_H_qqqq',
               'label_QCD_bb', 'label_QCD_cc', 'label_QCD_b', 'label_QCD_c', 'label_QCD_others',
               ]
-reweight_var = ['fj_pt', 'fjPuppi_corrsdmass']
+reweight_var = ['fj_pt', 'fj_sdmass_fromsubjets']
 reweight_classes = [
     'fj_isTop',
     'fj_isW',
     'fj_isZ',
-    'label_H_bb', 'label_H_cc', 'label_H_qqqq',  # H_bb, H_cc class_wgt divided by 2, H_qqqq devided by ~10 to become 1
+    'label_H_bb', 'label_H_cc', 'label_H_qqqq',  # H_bb, H_cc class_wgt divided by 2, H_qqqq devided by ~4-5 to become 1
     'fj_isQCD',
     ]
 reweight_method = 'flat'
+scale_method = 'max'
 var_img = None
 var_pos = None
 n_pixels = None

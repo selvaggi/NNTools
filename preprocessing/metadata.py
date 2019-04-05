@@ -34,6 +34,7 @@ class Metadata(object):
                  reweight_var=['fj_pt', 'fj_sdmass'],
                  reweight_classes=['fj_isTop', 'fj_isW', 'fj_isZ', 'fj_isH', 'fj_isQCD'],
                  reweight_method='flat',
+                 scale_method='upper',
                  var_img='pfcand_ptrel',
                  var_pos=['pfcand_etarel', 'pfcand_phirel'],
                  n_pixels=64,
@@ -58,6 +59,10 @@ class Metadata(object):
         if self.reweight_method not in ['none', 'flat', 'ref']:
             raise NotImplemented('reweight method %s not recognized' % reweight_method)
 
+        self.scale_method = scale_method.lower()
+        if self.scale_method not in ['upper', 'lower', 'average', 'max']:
+            raise NotImplemented('scale method %s not recognized' % scale_method)
+
         self.var_img = var_img
         self.var_pos = var_pos
         self.n_pixels = n_pixels
@@ -79,12 +84,16 @@ class Metadata(object):
         # write metadata
         self.writeMetadata(filepath)
 
-    def loadMetadata(self, filepath):
+    def loadMetadata(self, filepath, override=True):
         with open(filepath) as metafile:
             md = json.load(metafile, encoding='ascii')
             for k in md:
                 if k.startswith('_'): continue
-                setattr(self, k, md[k])
+                if override:
+                    setattr(self, k, md[k])
+                else:
+                    if not hasattr(self, k) or getattr(self, k) is None:
+                        setattr(self, k, md[k])
         logging.info('Metadata loaded from ' + filepath)
 
     def updateFilelist(self, test_sample=False):
@@ -92,7 +101,7 @@ class Metadata(object):
         self.inputfiles = []
         self.num_events = []
         counter = 0
-        for dp, dn, filenames in os.walk(self._inputdir):
+        for dp, dn, filenames in os.walk(self._inputdir, followlinks=True):
             if 'failed' in dp or 'ignore' in dp:
                 continue
             if self.input_filter and re.search(self.input_filter, dp):
@@ -107,7 +116,7 @@ class Metadata(object):
             for f in filenames:
                 if not f.endswith('.root'):
                     continue
-                fullpath = os.path.join(dp, f)
+                fullpath = os.path.realpath(os.path.join(dp, f))
                 nevts = get_num_events(fullpath, self.treename)
                 if nevts:
                     self.inputfiles.append(fullpath)
@@ -189,13 +198,15 @@ class Metadata(object):
         if self.reweight_method == 'flat':
             for label in self.reweight_classes:
                 hist = result[label]['hist']
-                hist_no_zeros = hist[hist > 0]
-                min_val = np.min(hist_no_zeros)
-                ref_val = np.percentile(hist_no_zeros, 10)
-                logging.debug('label:%s, min=%f, ref=%f, ref/min=%f' % (label, min_val, ref_val, ref_val / min_val))
+                hist_non_zero = hist[hist > 0]
+                min_val = np.min(hist_non_zero)
+                med_val = np.median(hist)
+                ref_val = np.percentile(hist_non_zero, 10)
+                logging.debug('label:%s, median=%f, min=%f, ref=%f, ref/min=%f' % (label, med_val, min_val, ref_val, ref_val / min_val))
                 class_events[label] = ref_val
                 wgt = ref_val / hist  # will produce inf if hist[ix,iy]=0
                 wgt[np.isinf(wgt)] = 0  # get rid of inf
+                wgt = np.clip(wgt, 0, 5)
                 result[label]['hist'] = wgt.tolist()
             min_nevt = min(class_events.values())
             for label in self.reweight_classes:
@@ -223,6 +234,7 @@ class Metadata(object):
         if self.reweight_method == 'none':
             logging.info('-- Reweighting is disabled --')
             return
+        logging.info('Start making weights...\n Var: %s\n Classes: %s\n Selection: %s' % (str(self.reweight_var), str(self.reweight_classes), self.selection))
         # fraction of events to take from each file
         from root_numpy import root2array
         frac = 1.0
@@ -286,6 +298,7 @@ class Metadata(object):
             self.branches_info[var] = {
                 'size'  : size,
                 'median': float(np.percentile(a, 50)),  # need float otherwise cannot serialize to json
+                'lower' : float(np.percentile(a, 16)),
                 'upper' : float(np.percentile(a, 84)),
                 'min'   : float(np.min(a)),
                 'max'   : float(np.max(a)),

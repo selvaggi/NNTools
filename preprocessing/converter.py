@@ -63,7 +63,14 @@ def _transform_var(md, rec, h5file, cols, no_transform=False, pad_method='zero')
         logging.debug('Transforming variable %s' % var)
         info = md.branches_info[var]
         median = np.float32(info['median'])
-        scale = np.float32(info['upper'] - info['median'])
+        if md.scale_method == 'upper':
+            scale = np.float32(info['upper'] - info['median'])
+        elif md.scale_method == 'lower':
+            scale = np.float32(info['median'] - info['lower'])
+        elif md.scale_method == 'average':
+            scale = 0.5 * np.float32(info['upper'] - info['lower'])
+        elif md.scale_method == 'max':
+            scale = np.float32(np.maximum(info['upper'] - info['median'], info['median'] - info['lower']))
         if scale == 0:
             scale = 1
         if info['size'] and info['size'] > 1:
