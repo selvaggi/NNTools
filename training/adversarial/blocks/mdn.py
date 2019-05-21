@@ -23,24 +23,31 @@ class SELU(gluon.nn.Activation):
 
 
 class DenseNet(gluon.nn.HybridBlock):
-    def __init__(self, num_layers, hidden_units, num_classes, **kwargs):
+    def __init__(self, num_layers, hidden_units, num_classes=None, apply_log_softmax=True, **kwargs):
         super(DenseNet, self).__init__(**kwargs)
+        self.num_classes = num_classes
+        self.apply_log_softmax = apply_log_softmax
         with self.name_scope():
             # first build a body as feature
             self.body = gluon.nn.HybridSequential()
             for i in range(num_layers):
                 self.body.add(gluon.nn.Dense(hidden_units, weight_initializer=mx.init.Xavier()))
                 self.body.add(SELU())
-            self.body.add(gluon.nn.Dense(num_classes, weight_initializer=mx.init.Xavier()))
+            if num_classes is not None:
+                self.body.add(gluon.nn.Dense(num_classes, weight_initializer=mx.init.Xavier()))
 
     def hybrid_forward(self, F, x):
         fc_out = self.body(x)
-        log_softmax = F.log_softmax(fc_out)
-        return log_softmax
+        if self.num_classes is not None and self.apply_log_softmax:
+            return F.log_softmax(fc_out)
+        else:
+            return fc_out
 
 class DenseNetDropout(gluon.nn.HybridBlock):
-    def __init__(self, num_layers, hidden_units, num_classes, drop=None, **kwargs):
+    def __init__(self, num_layers, hidden_units, num_classes=None, drop=None, apply_log_softmax=True, **kwargs):
         super(DenseNetDropout, self).__init__(**kwargs)
+        self.num_classes = num_classes
+        self.apply_log_softmax = apply_log_softmax
         with self.name_scope():
             # first build a body as feature
             self.body = gluon.nn.HybridSequential()
@@ -49,12 +56,15 @@ class DenseNetDropout(gluon.nn.HybridBlock):
                 self.body.add(gluon.nn.LeakyReLU(0.2))
                 if drop is not None and drop[i] is not None:
                     self.body.add(gluon.nn.Dropout(drop[i]))
-            self.body.add(gluon.nn.Dense(num_classes, weight_initializer=mx.init.Xavier()))
+            if num_classes is not None:
+                self.body.add(gluon.nn.Dense(num_classes, weight_initializer=mx.init.Xavier()))
 
     def hybrid_forward(self, F, x):
         fc_out = self.body(x)
-        log_softmax = F.log_softmax(fc_out)
-        return log_softmax
+        if self.num_classes is not None and self.apply_log_softmax:
+            return F.log_softmax(fc_out)
+        else:
+            return fc_out
 
 class MixtureDensityNetwork(gluon.nn.HybridBlock):
     def __init__(self, num_layers, hidden_units,
