@@ -54,6 +54,7 @@ def _make_class_weight(md, rec, h5file, name='class_weight'):
     _write_carray(wgt, h5file, name)
 
 def _transform_var(md, rec, h5file, cols, no_transform=False, pad_method='zero'):
+    var_groups = set()
     for var in cols:
         var = str(var)  # get rid of unicode
         if no_transform:
@@ -74,6 +75,14 @@ def _transform_var(md, rec, h5file, cols, no_transform=False, pad_method='zero')
         if scale == 0:
             scale = 1
         if info['size'] and info['size'] > 1:
+            # create mask array
+            if '_' in var:
+                group_name = var.split('_')[0]
+                if group_name not in var_groups:
+                    mask = [np.ones_like(x) for x in rec[var]]
+                    mask = pad_sequences(mask, maxlen=info['size'], dtype='float32', padding='post', truncating='post', value=0)
+                    _write_carray(mask, h5file, name=group_name + '_mask')
+                    var_groups.add(group_name)
             # for sequence-like vars, perform padding first
             if pad_method == 'min':
                 pad_value = info['min'] - scale  # ->min-1 ## FIXME: which is the better padding value
