@@ -65,7 +65,10 @@ if __name__ == '__main__':
         args.num_examples = n_train
 
     if args.predict:
-        fit.predict(args, dd.load_data)
+        # load network
+        sym = import_module('symbols.' + args.network)
+
+        fit.predict(args, sym, dd.load_data)
     else:
         # load network
         sym = import_module('symbols.' + args.network)

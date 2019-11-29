@@ -4,23 +4,36 @@ import logging
 import os
 import time
 
+from common.lr_schedulers import OneCycleSchedule
+from common.lr_finder import LRFinder
+
 def _get_lr_scheduler(args, kv):
-    if 'lr_factor' not in args or args.lr_factor >= 1:
-        return (args.lr, None)
     epoch_size = args.num_examples // args.batch_size
     if 'dist' in args.kv_store:
         epoch_size //= kv.num_workers
-    begin_epoch = args.load_epoch if args.load_epoch else 0
-    step_epochs = [int(l) for l in args.lr_step_epochs.split(',')]
-    lr = args.lr
-    for s in step_epochs:
-        if begin_epoch >= s:
-            lr *= args.lr_factor
-    if lr != args.lr:
-        logging.info('Adjust learning rate to %e for epoch %d' %(lr, begin_epoch))
 
-    steps = [epoch_size * (x-begin_epoch) for x in step_epochs if x-begin_epoch > 0]
-    return (lr, mx.lr_scheduler.MultiFactorScheduler(step=steps, factor=args.lr_factor))
+    if args.cycle_epochs > 0:
+        schedule = OneCycleSchedule(start_lr=args.lr,
+                                    max_lr=args.max_lr,
+                                    cycle_length=args.cycle_epochs * epoch_size,
+                                    cooldown_length=args.cooldown_epochs * epoch_size,
+                                    finish_lr=args.finish_lr)
+        return args.lr, schedule
+    else:
+        if 'lr_factor' not in args or args.lr_factor >= 1:
+            return (args.lr, None)
+        begin_epoch = args.load_epoch if args.load_epoch else 0
+        step_epochs = [int(l) for l in args.lr_step_epochs.split(',')]
+        lr = args.lr
+        for s in step_epochs:
+            if begin_epoch >= s:
+                lr *= args.lr_factor
+        if lr != args.lr:
+            logging.info('Adjust learning rate to %e for epoch %d' % (lr, begin_epoch))
+
+        steps = [epoch_size * (x - begin_epoch) for x in step_epochs if x - begin_epoch > 0]
+        return (lr, mx.lr_scheduler.MultiFactorScheduler(step=steps, factor=args.lr_factor, base_lr=lr))
+
 
 def _load_model(args, rank=0):
     if 'load_epoch' not in args or args.load_epoch is None:
@@ -67,6 +80,18 @@ def add_fit_args(parser):
                        help='the ratio to reduce lr on each step')
     train.add_argument('--lr-step-epochs', type=str,
                        help='the epochs to reduce the lr, e.g. 30,60')
+    train.add_argument('--max-lr', type=float, default=0.1,
+                       help='max learning rate')
+    train.add_argument('--finish-lr', type=float, default=0.1,
+                       help='finish learning rate')
+    train.add_argument('--cycle-epochs', type=int, default=0,
+                       help='num of cycle epochs')
+    train.add_argument('--cooldown-epochs', type=int, default=0,
+                       help='num of cycle epochs')
+    train.add_argument('--lr-finder-start', type=float, default=-1,
+                       help='start lr for the lr finder')
+    train.add_argument('--lr-finder-output', type=str, default='lr_finder.pdf',
+                       help='output file name for the lr finder')
     train.add_argument('--optimizer', type=str, default='sgd',
                        help='the optimizer type')
     train.add_argument('--mom', type=float, default=0.9,
@@ -168,6 +193,7 @@ def fit(args, symbol, data_loader, **kwargs):
                 histtype='step')
         return
 
+    args.data_shapes = {key:shape for key, shape in train.provide_data}
     logging.info('Data shape:\n' + str(train.provide_data))
     logging.info('Label shape:\n' + str(train.provide_label))
 
@@ -208,6 +234,9 @@ def fit(args, symbol, data_loader, **kwargs):
     if args.optimizer == 'sgd':
         optimizer_params['momentum'] = args.mom
         optimizer_params['wd'] = args.wd
+    elif args.optimizer == 'bertadam':
+        import gluonnlp
+        optimizer_params['wd'] = args.wd
 
     monitor = mx.mon.Monitor(args.monitor, pattern=".*") if args.monitor > 0 else None
 
@@ -232,27 +261,40 @@ def fit(args, symbol, data_loader, **kwargs):
 
     eval_batch_end_callback = [mx.callback.Speedometer(args.batch_size, args.disp_batches * 10, False)]
 
-    # run
-    logging.info('Start training...')
-    model.fit(train,
-        begin_epoch        = args.load_epoch if args.load_epoch else 0,
-        num_epoch          = args.num_epochs,
-        eval_data          = val,
-        eval_metric        = eval_metrics,
-        kvstore            = kv if use_kv else None,
-        optimizer          = args.optimizer,
-        optimizer_params   = optimizer_params,
-        initializer        = initializer,
-        arg_params         = arg_params,
-        aux_params         = aux_params,
-        batch_end_callback = batch_end_callbacks,
-        epoch_end_callback = checkpoint,
-        eval_batch_end_callback = eval_batch_end_callback,
-        allow_missing      = True,
-        monitor            = monitor)
+    if args.lr_finder_start > 0:
+        logging.info('Start running the learning rate finder...')
+        lr_finder = LRFinder(model)
+        if 'lr_scheduler' in optimizer_params:
+            del optimizer_params['lr_scheduler']
+        lr_finder.find(train,
+                       initializer=initializer,
+                       optimizer=args.optimizer,
+                       optimizer_params=optimizer_params,
+                       lr_start=args.lr_finder_start)
+        lr_finder.plot(args.lr_finder_output)
+        return
+    else:
+        # run
+        logging.info('Start training...')
+        model.fit(train,
+            begin_epoch=args.load_epoch if args.load_epoch else 0,
+            num_epoch=args.num_epochs,
+            eval_data=val,
+            eval_metric=eval_metrics,
+            kvstore=kv if use_kv else None,
+            optimizer=args.optimizer,
+            optimizer_params=optimizer_params,
+            initializer=initializer,
+            arg_params=arg_params,
+            aux_params=aux_params,
+            batch_end_callback=batch_end_callbacks,
+            epoch_end_callback=checkpoint,
+            eval_batch_end_callback=eval_batch_end_callback,
+            allow_missing=True,
+            monitor=monitor)
 
 
-def predict(args, data_loader, **kwargs):
+def predict(args, symbol, data_loader, **kwargs):
     """
     predict with a trained a model
     args : argparse returns
@@ -268,9 +310,11 @@ def predict(args, data_loader, **kwargs):
 
     # data iterators
     data_iter = data_loader(args)
+    args.data_shapes = {key:shape for key, shape in data_iter.provide_data}
 
     # load model
     sym, arg_params, aux_params = _load_model(args, kv.rank)
+    network = symbol.get_symbol(data_iter._data_format.num_classes, **vars(args))
 
     # devices for training
     devs = mx.cpu() if args.gpus is None or args.gpus is '' else [
@@ -279,7 +323,8 @@ def predict(args, data_loader, **kwargs):
     # create model
     model = mx.mod.Module(
         context=devs,
-        symbol=sym,
+#         symbol=sym,
+        symbol=network,
         data_names=args.data_names.split(','),
         label_names=args.label_names.split(','),
     )
@@ -312,7 +357,8 @@ def predict(args, data_loader, **kwargs):
             outdir = os.path.dirname(args.predict_output)
             if not os.path.exists(outdir):
                 os.makedirs(outdir)
-#             df.to_hdf(args.predict_output, 'Events', format='table')
+            if os.path.splitext(args.predict_output)[1] == '.h5':
+                df.to_hdf(args.predict_output, 'Events', format='table')
 
             from common.util import plotROC
             plotROC(preds, truths, output=os.path.join(outdir, 'roc.pdf'))

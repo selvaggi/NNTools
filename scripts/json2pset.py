@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import json
 import FWCore.ParameterSet.Config as cms
 import argparse
@@ -45,10 +46,30 @@ parser.add_argument('-n', '--name',
     default='pfDeepBoostedJetPreprocessParams',
     help='Params name.'
 )
+parser.add_argument('--add-mask',
+    action='store_true', default=False,
+    help='Add mask variable.'
+)
 args = parser.parse_args()
 
 with open(args.input) as fp:
     j = json_load_byteified(fp)
+
+if args.add_mask:
+    input_cats = set([n.split('_')[0] for n in j['input_names']])
+    for n in input_cats:
+        if 'pf' in n:
+            n = 'pfcand'
+        j['var_info'][n + '_mask'] = {
+            "lower": 0.0,
+            "max": 1.0,
+            "mean": 0.0,
+            "median": 0.0,
+            "min": 0.0,
+            "size": j['var_info'][n + '_phirel']['size'],
+            "std": 1.0,
+            "upper": 1.0
+            }
 
 cfg = cms.PSet()
 cfg.input_names = cms.vstring(*j['input_names'])
@@ -71,7 +92,7 @@ for name in j['input_names']:
     for v in j['var_names'][name]:
         info = j['var_info'][v]
         if scale_method == 'upper':
-            scale = info['upper'] - info['median']
+            scale = np.float32(info['upper']) - np.float32(info['median'])
         elif scale_method == 'max':
             scale = max(info['upper'] - info['median'], info['median'] - info['lower'])
         else:
@@ -80,7 +101,7 @@ for name in j['input_names']:
             scale = 1
         pvar = cms.PSet(
             median=cms.double(info['median']),
-            norm_factor=cms.double(1. / scale),
+            norm_factor=cms.double(float(np.float32(1.) / scale)),
             )
         setattr(p.var_infos, v, pvar)
 

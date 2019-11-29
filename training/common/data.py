@@ -30,7 +30,8 @@ def add_data_args(parser):
     return data
 
 class DataFormat(object):
-    def __init__(self, train_groups, train_vars, label_var, wgtvar, obs_vars=[], extra_label_vars=[], sort_by=None, filename=None, plotting_mode=False, train_var_range=None):
+
+    def __init__(self, train_groups, train_vars, label_var, wgtvar, obs_vars=[], extra_label_vars=[], pad_params=None, pad_dest_vars=[], pad_src_var=None, pad_constant=None, pad_random_range=None, random_augment_vars=None, random_augment_scale=None, sort_by=None, point_mode=None, filename=None, plotting_mode=False, train_var_range=None):
         self.train_groups = train_groups  # list
         self.train_vars = train_vars  # dict
         self.sort_by = sort_by  # dict {v_group:{'var':x, 'descend':False}}
@@ -38,6 +39,23 @@ class DataFormat(object):
         self.wgtvar = wgtvar  # set to None if not using weights
         self.obs_vars = obs_vars  # list
         self.extra_label_vars = extra_label_vars  # list
+        self.point_mode = point_mode
+        self.pad_params = pad_params
+        if pad_params is None:
+            self.pad_params = {v_group:{
+                'vars':pad_dest_vars,  # list
+                'src':pad_src_var,  # str
+                'constant':pad_constant,  # float
+                'random':pad_random_range,  # list or tuple of 2 floats
+                } for v_group in train_groups}
+        else:
+            for v_group in train_groups:
+                if v_group not in self.pad_params:
+                    self.pad_params[v_group] = {'src':None, 'vars':[]}
+        if pad_params is not None and pad_src_var is not None:
+            logging.debug('Padding info:\n  ' + str(self.pad_params))
+        self.random_augment_vars = random_augment_vars  # list
+        self.random_augment_scale = random_augment_scale  # float
         self._set_range(plotting_mode, train_var_range)
         self._parse_file(filename)
 
@@ -99,6 +117,10 @@ class DataFormat(object):
                 else:
                     raise RuntimeError
                 self.train_groups_shapes[v_group] = (n_channels, width, height)
+                if self.point_mode == 'NPC':
+                    self.train_groups_shapes[v_group] = (width, n_channels)
+                elif self.point_mode == 'NCP':
+                    self.train_groups_shapes[v_group] = (n_channels, width)
 
 
 class PyTableEnqueuer(object):
@@ -156,8 +178,11 @@ class PyTableEnqueuer(object):
                     # features
                     X_fetch = {}
                     for v_group in self._data_format.train_groups:
+                        pad_param = self._data_format.pad_params[v_group]
                         # update variable ordering if needed
                         if self._data_format.sort_by and self._data_format.sort_by[v_group]:
+                            if pad_param['src'] is not None:
+                                raise NotImplemented('Cannot do random pad and sorting at the same time now -- to be implemented')
                             ref_a = getattr(f.root, self._data_format.sort_by[v_group]['var'])[fbegin:fend]
                             len_a = getattr(f.root, self._data_format.sort_by[v_group]['length_var'])[fbegin:fend]
                             for i in range(len_a.shape[0]):
@@ -173,7 +198,23 @@ class PyTableEnqueuer(object):
                             X_group = [getattr(f.root, v_name)[fbegin:fend][np.arange(ref_a.shape[0])[:, np.newaxis], sorting_indices]
                                        for v_name in self._data_format.train_vars[v_group]]
                         else:
-                            X_group = [getattr(f.root, v_name)[fbegin:fend] for v_name in self._data_format.train_vars[v_group]]
+                            X_group = []
+                            pad_mask_a = None if pad_param['src'] is None else getattr(f.root, pad_param['src'])[fbegin:fend] == 0
+                            for v_name in self._data_format.train_vars[v_group]:
+                                a = getattr(f.root, v_name)[fbegin:fend]
+                                if v_name in pad_param['vars']:
+                                    if pad_mask_a is None:
+                                        raise RuntimeError('Padding `src` is not set for group %s!' % v_group)
+                                    if pad_param.get('constant', None) is not None:
+                                        a[pad_mask_a] = pad_param['constant']
+                                    elif pad_param.get('random', None) is not None:
+                                        a_rand = np.random.uniform(low=pad_param['random'][0], high=pad_param['random'][1], size=a.shape)
+                                        a[pad_mask_a] = a_rand[pad_mask_a]
+                                    else:
+                                        raise RuntimeError('Neither `constant` nor `random` is set for padding!')
+                                if not self._predict_mode and self._data_format.random_augment_vars is not None and v_name in self._data_format.random_augment_vars:
+                                    a *= np.random.normal(loc=1, scale=self._data_format.random_augment_scale, size=a.shape)
+                                X_group.append(a)
                         
                         shape = (-1,) + self._data_format.train_groups_shapes[v_group]  # (n, C, W, H), use -1 because end can go out of range
                         if X_group[0].ndim == 3:
@@ -183,7 +224,10 @@ class PyTableEnqueuer(object):
                         elif X_group[0].ndim < 3:
                             # shape=(n, W) if ndim=2: (e.g., track list)
                             # shape=(n,) if ndim=1: (glovar var)
-                            x_arr = np.stack(X_group, axis=1)
+                            if self._data_format.point_mode == 'NPC':
+                                x_arr = np.stack(X_group, axis=-1)
+                            else:
+                                x_arr = np.stack(X_group, axis=1)
                         else:
                             raise NotImplemented
     #                         if seq_order == 'channels_last':
