@@ -7,8 +7,8 @@ Load the converted PyTables files and train DNNs with MXNet.
 #### Install miniconda if you don't have it:
 
 ```bash
-wget https://repo.anaconda.com/miniconda/Miniconda2-latest-Linux-x86_64.sh
-bash Miniconda2-latest-Linux-x86_64.sh
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh
 # Follow the insturctions to finish the installation
 ```
 
@@ -17,7 +17,7 @@ Verify the installation is successful by running `conda info`.
 If you cannot run `conda` command, check if the you added the conda path to your `PATH` variable in your bashrc/zshrc file, e.g., 
 
 ```bash
-export PATH="$HOME/miniconda2/bin:$PATH"
+export PATH="$HOME/miniconda3/bin:$PATH"
 ```
 
 #### Set up the environment for training
@@ -26,18 +26,18 @@ The following instruction is only for training with Nvidia GPU. CUDA 8.0 and cuD
 
 ```bash
 # create a new conda environment
-conda create -n mxnet python=2.7
+conda create -n mxnet python=3.7
 
 # set up ROOT
 # (below assumes centos7, for other systems please modify the ROOT installation path accordingly)
-mkdir -p $HOME/miniconda2/envs/mxnet/etc/conda/
-cd $HOME/miniconda2/envs/mxnet/etc/conda/
+mkdir -p $HOME/miniconda3/envs/mxnet/etc/conda/
+cd $HOME/miniconda3/envs/mxnet/etc/conda/
 mkdir activate.d  deactivate.d
 cd activate.d
 # create the env_vars.sh file to get ROOT environment
 cat << EOF > env_vars.sh
 #!/bin/sh
-# $HOME/miniconda2/envs/prep/etc/conda/activate.d/env_vars.sh
+# $HOME/miniconda3/envs/prep/etc/conda/activate.d/env_vars.sh
 echo "Source root environment..."
 # ROOT
 source /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.14.06/x86_64-centos7-gcc48-opt/bin/thisroot.sh
@@ -51,8 +51,8 @@ conda install -c anaconda hdf5
 pip install numpy numexpr pandas scikit-learn scipy tables matplotlib
 pip install root-numpy
 
-# install mxnet -- this depends on the CUDA version (the current recommendation is CUDA 9.2)
-pip install mxnet-cu92
+# install mxnet -- this depends on the CUDA version (the current recommendation is CUDA 10.1)
+pip install mxnet-cu101
 
 # for other CUDA versions, please check https://mxnet.incubator.apache.org/install/
 ```
