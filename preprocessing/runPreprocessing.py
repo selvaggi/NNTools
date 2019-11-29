@@ -160,7 +160,7 @@ exit $status
 
     condordesc = '''\
 universe              = vanilla
-requirements          = (Arch == "X86_64") && (OpSys == "LINUX")
+requirements          = (Arch == "X86_64") && (OpSysAndVer =?= "CentOS7")
 request_disk          = 10000000
 request_memory        = 8192
 executable            = {scriptfile}
@@ -170,7 +170,7 @@ output                = {jobdir}/$(jobid).out
 error                 = {jobdir}/$(jobid).err
 log                   = {jobdir}/$(jobid).log
 use_x509userproxy     = true
-+MaxRuntime           = 172800
++MaxRuntime           = 24000
 Should_Transfer_Files = YES
 queue jobid from {jobids_file}
 '''.format(scriptfile=os.path.abspath(scriptfile),
