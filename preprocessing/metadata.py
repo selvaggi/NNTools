@@ -86,7 +86,7 @@ class Metadata(object):
 
     def loadMetadata(self, filepath, override=True):
         with open(filepath) as metafile:
-            md = json.load(metafile, encoding='ascii')
+            md = json.load(metafile)
             for k in md:
                 if k.startswith('_'): continue
                 if override:
@@ -138,7 +138,7 @@ class Metadata(object):
 
     def writeMetadata(self, filepath):
         with open(filepath, 'w') as metafile:
-            json.dump(self.__dict__, metafile, indent=2, encoding='ascii', sort_keys=True)
+            json.dump(self.__dict__, metafile, indent=2, sort_keys=True)
         logging.info('Metadata written to ' + filepath)
 
 

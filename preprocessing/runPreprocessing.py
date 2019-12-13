@@ -89,6 +89,12 @@ def submit(args):
         from helper import xrd
         md, njobs = update_metadata(args)
 
+        if 'LCG_VERSION' in os.environ:
+            env_setup = 'source %s' % args.lcg_env
+        else:
+            env_setup = '''export PATH={conda_path}:$PATH
+source activate {conda_env_name}'''.format(conda_path=args.conda_path, conda_env_name=args.conda_env_name)
+
         script = \
 '''#!/bin/bash
 jobid=$1
@@ -99,8 +105,8 @@ echo "workdir: $workdir"
 echo "args: $@"
 ls -l
 
-export PATH={conda_path}:$PATH
-source activate {conda_env_name}
+{env_setup}
+
 echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
 
 python {script} {outputdir} $jobid -n {events} {test_sample}
@@ -116,8 +122,7 @@ else
 fi
 
 exit $status
-'''.format(conda_path=args.conda_path,
-           conda_env_name=args.conda_env_name,
+'''.format(env_setup=env_setup,
            script=os.path.abspath('converter.py'),
            outputdir=args.outputdir,
            events=args.events_per_file,
@@ -183,7 +188,8 @@ queue jobid from {jobids_file}
     with open(condorfile, 'w') as f:
         f.write(condordesc)
 
-    print('Run the following command to submit the jobs:\ncondor_submit {condorfile}'.format(condorfile=condorfile))
+    print('Run the following command to submit the jobs:\n condor_submit {condorfile}'.format(condorfile=condorfile))
+
 
 def run_all(args):
     md, njobs = update_metadata(args)
@@ -244,6 +250,10 @@ def main():
     parser.add_argument('--remake-weights',
         action='store_true', default=False,
         help='Remake reweighting weights. Default: %(default)s'
+    )
+    parser.add_argument('--lcg-env',
+        default='/cvmfs/sft.cern.ch/lcg/views/LCG_96bpython3/x86_64-centos7-gcc9-opt/setup.sh',
+        help='LCG env path. Default: %(default)s'
     )
     parser.add_argument('--conda-path',
         default='~/miniconda2/bin',

@@ -8,7 +8,19 @@ Converts from root ntuples to PyTables files for DNN training.
 
 ## Setup
 
-#### Install miniconda if you don't have it:
+### Option 1: Setup w/ LCG software stack (preferred)
+
+For centos7 (e.g., LXPLUS):
+
+```bash
+source /cvmfs/sft.cern.ch/lcg/views/LCG_96bpython3/x86_64-centos7-gcc9-opt/setup.sh
+```
+
+
+
+### Option 2: Setup w/ Miniconda (if LCG is not available)
+
+Install miniconda if you don't have it:
 
 ```bash
 wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh
