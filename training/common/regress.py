@@ -1,8 +1,27 @@
 from __future__ import print_function
 import mxnet as mx
+import numpy as np
 import logging
 import os
 import time
+
+
+def get_huber_loss(rho):
+
+    def huber_loss(label, pred):
+        if len(label.shape) == 1:
+            label = label.reshape(label.shape[0], 1)
+        if len(pred.shape) == 1:
+            pred = pred.reshape(pred.shape[0], 1)
+
+        loss = np.abs(pred - label)
+        loss = np.where(loss > rho, loss - 0.5 * rho,
+                       (0.5 / rho) * np.square(loss))
+
+        return loss.mean()
+
+    return huber_loss
+
 
 from common.lr_schedulers import OneCycleSchedule
 from common.lr_finder import LRFinder
@@ -137,6 +156,8 @@ def add_fit_args(parser):
                        help='run all predictions')
     train.add_argument('--predict-output', type=str,
                        help='predict output')
+    train.add_argument('--huber-rho', type=float, default=0.3,
+                       help='rho value for the huber loss')
     return train
 
 class dummyKV:
@@ -259,12 +280,14 @@ def fit(args, symbol, data_loader, **kwargs):
     else:
         initializer = mx.init.Xavier(
             rnd_type='gaussian', factor_type="in", magnitude=2)
-    # initializer   = mx.init.Xavier(factor_type="in", magnitude=2.34),
+#     initializer = mx.init.Xavier(factor_type="in", magnitude=2.34)
 
     # evaluation metrices
-    eval_metrics = ['accuracy', 'ce']
-    if args.top_k > 0:
-        eval_metrics.append(mx.metric.create('top_k_accuracy', top_k=args.top_k))
+    eval_metrics = [
+        mx.metric.MSE(output_names=['regression_output']),
+        mx.metric.MAE(output_names=['regression_output']),
+        mx.metric.CustomMetric(get_huber_loss(rho=args.huber_rho), output_names=['regression_output']),
+        ]
 
     # callbacks that run after each batch
     batch_end_callbacks = [mx.callback.Speedometer(args.batch_size, args.disp_batches, auto_reset=True)]
@@ -351,7 +374,12 @@ def predict(args, symbol, data_loader, **kwargs):
         data_iter = data_loader(args)
 
         tic = time.time()
-        preds = model.predict(data_iter).asnumpy()
+        preds = model.predict(data_iter)
+        if isinstance(preds, list):
+            preds = preds[0]
+        preds = preds.asnumpy()
+        if len(preds.shape) > 1:
+            preds = preds[:, 0]
         logging.info('Speed: %.2f samples/sec' % (1.*preds.shape[0] / (time.time() - tic)))
 
         truths = data_iter.get_truths()
@@ -360,9 +388,7 @@ def predict(args, symbol, data_loader, **kwargs):
         print(preds.shape, truths.shape, observers.shape)
 
         pred_output = {}
-        for i, label in enumerate(data_iter._data_format.class_labels):
-            pred_output['class_%s' % label] = truths[:, i]
-            pred_output['score_%s' % label] = preds[:, i]
+        pred_output['output'] = preds
         for i, obs in enumerate(data_iter._data_format.obs_vars):
             pred_output[obs] = observers[:, i]
 
@@ -376,8 +402,8 @@ def predict(args, symbol, data_loader, **kwargs):
             if os.path.splitext(args.predict_output)[1] == '.h5':
                 df.to_hdf(args.predict_output, 'Events', format='table')
 
-            from common.util import plotROC
-            plotROC(preds, truths, output=os.path.join(outdir, 'roc.pdf'))
+#             from common.util import plotROC
+#             plotROC(preds, truths, output=os.path.join(outdir, 'roc.pdf'))
 
             from root_numpy import array2root
             array2root(df.to_records(index=False), filename=args.predict_output.rsplit('.', 1)[0] + '.root', treename='Events', mode='RECREATE')

@@ -1,3 +1,4 @@
+import numpy as np
 import mxnet as mx
 import mxnet.gluon.nn as nn
 
@@ -165,6 +166,7 @@ class ParticleNet(nn.HybridBlock):
         self.fc_params = setting.fc_params
         self.num_class = setting.num_class
         self.ec_pooling = getattr(setting, 'pooling', 'average')  # default to average
+        self.use_fusion = getattr(setting, 'use_fusion', False)  # default to average
         if self.ec_pooling not in ('max', 'average'):
             raise RuntimeError('Pooling method should be "max" or "average"')
 
@@ -179,6 +181,14 @@ class ParticleNet(nn.HybridBlock):
                     in_channels = self.xconv_params[layer_idx - 1][1][-1]
                 xc = EdgeConv(K, channels, with_bn=True, activation='relu', pooling=self.ec_pooling, in_channels=in_channels, cpu_mode=getattr(setting, 'cpu_mode', False))
                 self.xconvs.add(xc)
+
+            if self.use_fusion:
+                in_chn = sum(x[1][-1] for x in self.xconv_params)
+                out_chn = np.clip((in_chn // 128) * 128, 128, 1024)
+                self.fusion_block = nn.HybridSequential()
+                self.fusion_block.add(nn.Conv1D(channels=out_chn, kernel_size=1, strides=1, use_bias=False, in_channels=in_chn, weight_initializer=mx.init.Xavier(rnd_type='gaussian', factor_type="in", magnitude=2)))
+                self.fusion_block.add(nn.BatchNorm(momentum=bn_momentum))
+                self.fusion_block.add(nn.Activation('relu'))
 
             if self.fc_params is not None:
                 self.fcs = nn.HybridSequential()
@@ -197,13 +207,19 @@ class ParticleNet(nn.HybridBlock):
             mask = (mask != 0)  # 1 if valid
             coord_shift = (mask == 0) * 99.  # 99 if non-valid
 
+        outputs = []
+
         for layer_idx, layer_param in enumerate(self.xconv_params):
 #             pts = points if layer_idx == 0 else F.broadcast_add(coord_shift, fts)
             pts = F.broadcast_add(coord_shift, points) if layer_idx == 0 else F.broadcast_add(coord_shift, fts)
             fts = self.xconvs[layer_idx](pts, fts)
+            if mask is not None:
+                fts = F.broadcast_mul(fts, mask)
+            if self.use_fusion:
+                outputs.append(fts)
 
-        if mask is not None:
-            fts = F.broadcast_mul(fts, mask)
+        if self.use_fusion:
+            fts = self.fusion_block(F.concat(*outputs, dim=1))
 
         pool = F.mean(fts, axis=-1)  # (N, C)
 

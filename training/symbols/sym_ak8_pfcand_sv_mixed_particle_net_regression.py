@@ -10,6 +10,37 @@ def split_batch_size(shape, k):
     return (shape[0] // k,) + shape[1:]
 
 
+def log_huber_loss(preds, labels, **kwargs):
+    rho = kwargs['huber_rho']
+    print('Using log huber loss w/ rho=%.f' % rho)
+    log_labels = mx.sym.log(mx.sym.maximum(labels, 1))
+    loss = mx.sym.make_loss(mx.gluon.loss.HuberLoss(rho=rho)(preds, log_labels), name='huber')
+    res = mx.sym.Group([mx.sym.BlockGrad(preds.exp(), name="regression"), loss])
+    return res
+
+
+def huber_loss(preds, labels, **kwargs):
+    rho = kwargs['huber_rho']
+    print('Using huber loss w/ rho=%.f' % rho)
+    loss = mx.sym.make_loss(mx.gluon.loss.HuberLoss(rho=rho)(preds, labels), name='huber')
+    res = mx.sym.Group([mx.sym.BlockGrad(preds, name="regression"), loss])
+    return res
+
+
+def mse_loss(preds, labels, **kwargs):
+    print('Using MSE loss')
+    loss = mx.sym.make_loss(mx.gluon.loss.L2Loss()(preds, labels), name='mse')
+    res = mx.sym.Group([mx.sym.BlockGrad(preds, name="regression"), loss])
+    return res
+
+
+def mae_loss(preds, labels, **kwargs):
+    print('Using MAE loss')
+    loss = mx.sym.make_loss(mx.gluon.loss.L1Loss()(preds, labels), name='mae')
+    res = mx.sym.Group([mx.sym.BlockGrad(preds, name="regression"), loss])
+    return res
+
+
 def get_symbol(num_classes, **kwargs):
     # pfcand
     pf_setting = DotDict()
@@ -50,7 +81,11 @@ def get_symbol(num_classes, **kwargs):
     mask = mx.sym.concat(pf_mask, sv_mask, dim=-1)
 
     output = pf_net(points, features, mask)
-    # -------
-    softmax = mx.sym.SoftmaxOutput(data=output, name='softmax')
 
-    return softmax
+    # -------
+    label = mx.sym.var('softmax_label')
+    result = log_huber_loss(output, label, **kwargs)
+#     result = mse_loss(output, label, **kwargs)
+#     result = mae_loss(output, label, **kwargs)
+
+    return result
