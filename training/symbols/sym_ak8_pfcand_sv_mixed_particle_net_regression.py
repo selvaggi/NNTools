@@ -51,7 +51,7 @@ def get_symbol(num_classes, **kwargs):
         (16, (256, 256, 256)),
         ]
     pf_setting.fc_params = [(256, 0.1)]
-    pf_setting.num_class = num_classes
+    pf_setting.num_class = 1
     pf_setting.use_fusion = True
     pf_setting.pooling = 'average'
     pf_setting.cpu_mode = (kwargs['gpus'] == '')
