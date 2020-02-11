@@ -27,6 +27,7 @@ def add_data_args(parser):
     data.add_argument('--dataloader-qsize', type=int, default=256, help='the queue size for data loader.')
     data.add_argument('--dataloader-weight-scale', type=float, default=1, help='the weight scale for data loader.')
     data.add_argument('--dataloader-max-resample', type=int, default=10, help='max times to repeat the sampling.')
+    data.add_argument('--dataloader-dilation', type=int, default=1, help='Randomly select 1 out of d of files for each epoch.')
     return data
 
 class DataFormat(object):
@@ -131,7 +132,7 @@ class PyTableEnqueuer(object):
         pickle_safe: use multiprocessing if True, otherwise threading
     """
 
-    def __init__(self, filelist, data_format, batch_size, workers=4, q_size=20, shuffle=True, predict_mode=False, fetch_size=100000, up_sample=False, weight_scale=1, max_resample=20):
+    def __init__(self, filelist, data_format, batch_size, workers=4, q_size=20, shuffle=True, predict_mode=False, fetch_size=100000, up_sample=False, weight_scale=1, max_resample=20, dilation=1):
         self._filelist = filelist
         self._data_format = data_format
         self._batch_size = batch_size
@@ -141,6 +142,7 @@ class PyTableEnqueuer(object):
         self._up_sample = up_sample
         self._weight_scale = weight_scale
         self._max_resample = max_resample
+        self._dilation = dilation
 
         self._workers = workers
         self._q_size = q_size
@@ -334,7 +336,10 @@ class PyTableEnqueuer(object):
             self.queue = multiprocessing.Queue(maxsize=self._q_size)
             self._idx = 0
             self._file_indices = np.arange(len(self._filelist))
-            np.random.shuffle(self._file_indices)
+            if self._shuffle:
+                np.random.shuffle(self._file_indices)
+            if self._dilation > 1:
+                self._file_indices = self._file_indices[::self._dilation]
             self.add()
         except:
             self.stop()
@@ -345,7 +350,7 @@ class PyTableEnqueuer(object):
         def run(ifile):
             self.data_generator_task(ifile)
 
-        if len(self._threads) >= len(self._filelist):
+        if len(self._threads) >= len(self._file_indices):
             # all files are processed
             return
 
@@ -401,6 +406,7 @@ class DataLoader(mx.io.DataIter):
         self._q_size = args.dataloader_qsize
         self._weight_scale = args.dataloader_weight_scale
         self._max_resample = args.dataloader_max_resample
+        self._dilation = args.dataloader_dilation
         self._predict_mode = predict_mode
         self._one_hot_label = one_hot_label
         self.args = args
@@ -418,7 +424,7 @@ class DataLoader(mx.io.DataIter):
         self.steps_per_epoch = h5_samples // batch_size
 
         if not self.args.syn_data:
-            self.enqueuer = PyTableEnqueuer(filelist, data_format, batch_size, self._workers, self._q_size, shuffle, predict_mode, fetch_size, up_sample, weight_scale=self._weight_scale, max_resample=self._max_resample)
+            self.enqueuer = PyTableEnqueuer(filelist, data_format, batch_size, self._workers, self._q_size, shuffle, predict_mode, fetch_size, up_sample, weight_scale=self._weight_scale, max_resample=self._max_resample, dilation=self._dilation)
             self._wait_time = 0.01  # in seconds
 
         self.reset()
