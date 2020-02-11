@@ -54,6 +54,12 @@ pip install root-numpy
 # install mxnet -- this depends on the CUDA version (the current recommendation is CUDA 10.1)
 pip install mxnet-cu101
 
+# to install without CUDA:
+pip install mxnet
+
+# install mxnet optimizer
+pip install gluonnlp
+
 # for other CUDA versions, please check https://mxnet.incubator.apache.org/install/
 ```
  
