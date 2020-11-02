@@ -52,7 +52,9 @@ pip install numpy numexpr pandas scikit-learn scipy tables matplotlib
 pip install root-numpy
 
 # install mxnet -- this depends on the CUDA version (the current recommendation is CUDA 10.1)
-pip install mxnet-cu101
+pip install mxnet-cu101==1.5.1.post0
+pip install pip install gluonnlp==0.8.3
+
 
 # for other CUDA versions, please check https://mxnet.incubator.apache.org/install/
 ```
